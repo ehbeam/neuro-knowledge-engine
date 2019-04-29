@@ -7,6 +7,8 @@ Codebase for a manuscript in preparation by Elizabeth Beam, Christopher Potts, R
 
 ### Manuscript
 
+| Figure | Script |
+| --------------- | ------------------------- |
 | **Figure 1b** | ontol/ontol\_kmeans.ipynb |
 | **Figure 2b** | ontol/ontol\_rdoc.ipynb |
 | **Figure 3** | ontol/ontol\_\*.ipynb |
@@ -17,6 +19,8 @@ Codebase for a manuscript in preparation by Elizabeth Beam, Christopher Potts, R
 
 ### Extended Data
 
+| Figure | Script |
+| --------------- | ------------------------- |
 | **Figure 1a, b, c** | corpus/cohorts.ipynb |
 | **Figure 1d, e, f** | corpus/word\_dynamics.py |
 | **Figure 5** | replic/replic\_\*.ipynb |
