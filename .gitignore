@@ -1,0 +1,14 @@
+# Ignore large data files
+.gz
+corpus*.txt
+dtm*.csv.gz
+glove*.txt
+
+# Ignore code and data from other sources
+en-verbs.txt
+word_forms.py
+CQHDimensionalPhenotyper
+Yeo_JNeurophysiol11_MNI152/
+style/
+dimensions/
+
