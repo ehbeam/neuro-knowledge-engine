@@ -145,8 +145,8 @@ def plot_freq_over_years(freq, freq_boot, file):
 
 
 words = ["dsm", "rdoc", "machine learning"]
-year2pmids = load_data_from_meta("metadata_filt_180811.csv")
-dir = "../../../nlp/corpus"
+year2pmids = load_data_from_meta("../data/metadata.csv")
+dir = "../../nlp/corpus"
 freq = extract_freq_by_year(words, year2pmids, dir)
 freq_boot = boot_freq_by_year(words, year2pmids, dir, n_iter=5000, verbose=True)
 plot_freq_over_years(freq, freq_boot, "cog_words_by_year")
