@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 np.random.seed(42)
 from scipy.spatial.distance import cdist
+import matplotlib.pyplot as plt
 from matplotlib import font_manager, rcParams
 from collections import OrderedDict
 
@@ -11,6 +12,14 @@ arial = "../style/Arial Unicode.ttf"
 font_md = font_manager.FontProperties(fname=arial, size=20)
 font_lg = font_manager.FontProperties(fname=arial, size=22)
 rcParams["axes.linewidth"] = 1.5
+
+c = {"red": "#CE7D69", "orange": "#BA7E39", "yellow": "#CEBE6D", 
+	 "chartreuse": "#AEC87C", "green": "#77B58A", "blue": "#7597D0", 
+	 "magenta": "#B07EB6", "purple": "#7D74A3", "brown": "#846B43"}
+
+palettes = {"data-driven": [c["blue"], c["magenta"], c["yellow"], c["green"], c["red"], c["purple"], c["orange"]],
+			"rdoc": [c["blue"], c["red"], c["green"], c["purple"], c["yellow"], c["orange"]],
+			"dsm": [c["purple"], c["chartreuse"], c["orange"], c["blue"], c["red"], c["magenta"], c["yellow"], c["green"], c["brown"]]}
 
 
 def doc_mean_thres(df):
@@ -280,10 +289,10 @@ def compute_sims(df, seed_centroid, labels, vsm, level="DOMAIN"):
 
 
 def report_significance(pvals, labels, alphas=[0.01, 0.001, 0.0001]):
-    for p, lab in zip(pvals, labels):
-        stars = "".join(["*" for alpha in alphas if p < alpha])
-        print("{:22s} p={:6.6f} {}".format(lab, p, stars))
-        
+	for p, lab in zip(pvals, labels):
+		stars = "".join(["*" for alpha in alphas if p < alpha])
+		print("{:22s} p={:6.6f} {}".format(lab, p, stars))
+		
 
 def score_lists(lists, dtm, label_var="LABEL"):
 	labels = OrderedDict.fromkeys(lists[label_var])
@@ -294,6 +303,51 @@ def score_lists(lists, dtm, label_var="LABEL"):
 		list_counts[label] = dtm[tkns].sum(axis=1)
 	list_scores = doc_mean_thres(list_counts)
 	return list_scores
+
+
+def transparent_background(file_name):
+	from PIL import Image
+	img = Image.open(file_name)
+	img = img.convert("RGBA")
+	data = img.getdata()
+	newData = []
+	for item in data:
+		if item[0] == 255 and item[1] == 255 and item[2] == 255:
+			newData.append((255, 255, 255, 0))
+		else:
+			newData.append(item)
+	img.putdata(newData)
+	img.save(file_name, "PNG")
+
+
+def plot_wordclouds(framework, domains, lists, dtm):
+	
+	from wordcloud import WordCloud
+	
+	for i, dom in enumerate(domains):
+		print(dom)
+		
+		def color_func(word, font_size, position, orientation, 
+					   random_state=None, idx=0, **kwargs):
+			return palettes[framework][i]
+
+		tkns = lists.loc[lists["DOMAIN"] == dom, "TOKEN"]
+		freq = dtm[tkns].sum().values
+		tkns = [t.replace("_", " ") for t in tkns]
+
+		cloud = WordCloud(background_color="rgba(255, 255, 255, 0)", mode="RGB", 
+						  max_font_size=100, prefer_horizontal=1, scale=20, margin=3,
+						  width=550, height=15*len(tkns)+550, font_path=arial, 
+						  random_state=42).generate_from_frequencies(zip(tkns, freq))
+
+		fig = plt.figure(1, figsize=(2,10))
+		plt.axis("off")
+		plt.imshow(cloud.recolor(color_func=color_func, random_state=42))
+		file_name = "figures/lists/{}_wordcloud_{}.png".format(framework, dom)
+		plt.savefig(file_name, 
+					dpi=800, bbox_inches="tight")
+		transparent_background(file_name)
+		plt.show()
 
 
 def make_cmap(colors, position=None, bit=False):
@@ -392,10 +446,7 @@ def load_atlas():
 
 def map_plane(estimates, atlas, path, suffix="", plane="z", cbar=False, annotate=False,
 			  vmin=None, vmax=None, cmaps=[], print_fig=True, verbose=False):
-	
 	from nilearn import image, plotting
-	from PIL import Image
-
 	for f, feature in enumerate(estimates.columns):
 		stat_map = image.copy_img(atlas).get_data()
 		data = estimates[feature]
@@ -415,20 +466,7 @@ def map_plane(estimates, atlas, path, suffix="", plane="z", cbar=False, annotate
 										 annotate=annotate, draw_cross=False)
 		file_name = "{}/{}{}.png".format(path, feature, suffix)
 		display.savefig(file_name, dpi=250)
-
-		# Remove image background
-		img = Image.open(file_name)
-		img = img.convert("RGBA")
-		data = img.getdata()
-		newData = []
-		for item in data:
-			if item[0] == 255 and item[1] == 255 and item[2] == 255:
-				newData.append((255, 255, 255, 0))
-			else:
-				newData.append(item)
-		img.putdata(newData)
-		img.save(file_name, "PNG")
-
+		transparent_background(file_name)
 		if print_fig:
 			plotting.show()
 		display.close()

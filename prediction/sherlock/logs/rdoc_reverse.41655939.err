@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "rdoc_reverse.py", line 4, in <module>
+    prediction.train_classifier.run('rdoc', 'reverse', suffix='_opsim')
+AttributeError: 'function' object has no attribute 'run'
+srun: error: sh-101-30: task 0: Exited with exit code 1

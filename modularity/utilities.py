@@ -3,41 +3,15 @@
 import pandas as pd
 import numpy as np
 np.random.seed(42)
-import matplotlib.pyplot as plt
-from matplotlib import cm, font_manager, rcParams
 
 
-arial = "../style/Arial Unicode.ttf"
-prop = font_manager.FontProperties(fname=arial, size=20)
-prop_lg = font_manager.FontProperties(fname=arial, size=24)
-rcParams["axes.linewidth"] = 1.5
+c = {"red": "#CE7D69", "orange": "#BA7E39", "yellow": "#CEBE6D", 
+	 "chartreuse": "#AEC87C", "green": "#77B58A", "blue": "#7597D0", 
+	 "magenta": "#B07EB6", "purple": "#7D74A3", "brown": "#846B43"}
 
-
-palettes = {
-			   "data-driven": ["#778AA3", # Blue
-							   "#B07EB6", # Magenta
-							   "#CEBE6D", # Yellow
-							   "#77B58A", # Green
-							   "#CE7D69", # Red
-							   "#7D74A3", # Purple
-							   "#BA7E39"], # Orange
-							   
-			   "rdoc": ["#778AA3", # Blue
-						"#CE7D69", # Red
-						"#77B58A", # Green
-						"#7D74A3", # Yellow
-						"#CEBE6D", # Purple
-						"#BA7E39"], # Orange
-			   
-			   "dsm": ["#7D74A3", # Purple
-					   "#D1E29E", # Chartreuse
-					   "#BA7E39", # Orange
-					   "#778AA3", # Blue
-					   "#CE7D69", # Red
-					   "#B07EB6", # Magenta
-					   "#CEBE6D", # Yellow
-					   "#77B58A"] # Green
-		  }
+palettes = {"data-driven": [c["blue"], c["magenta"], c["yellow"], c["green"], c["red"], c["purple"], c["orange"]],
+			"rdoc": [c["blue"], c["red"], c["green"], c["purple"], c["yellow"], c["orange"]],
+			"dsm": [c["purple"], c["chartreuse"], c["orange"], c["blue"], c["red"], c["magenta"], c["yellow"], c["green"], c["brown"]]}
 
 
 def doc_mean_thres(df):
@@ -70,8 +44,16 @@ def load_framework(framework, suffix=""):
 
 
 def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="mod",
-				 dx=[], dy=0.26, interval=0.999, alphas=[0.01, 0.001, 0.0001],
-				 ylim=[0.5,6.5], yticks=range(1,7)):
+				 dx=[], dy=0.5, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001],
+				 ylim=[0.5,10.5], yticks=[2,4,6,8,10]):
+
+	import matplotlib.pyplot as plt
+	from matplotlib import cm, font_manager, rcParams
+
+	arial = "../style/Arial Unicode.ttf"
+	prop = font_manager.FontProperties(fname=arial, size=20)
+	prop_lg = font_manager.FontProperties(fname=arial, size=24)
+	rcParams["axes.linewidth"] = 1.5
 
 	# Set up figure
 	fig = plt.figure(figsize=(4.5, 2.1))
@@ -97,7 +79,7 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="mod"
 		dys = dy * np.array([0, 1, 2])
 		for alpha, y in zip(alphas, dys):
 			if df["FDR"][i] < alpha:
-				plt.text(i-0.115, min(max(data), 6) + y, "*", 
+				plt.text(i-ds, min(max(data), 9.5) + y, "*", 
 						 fontproperties=prop_lg)
 
 	# Confidence interval of null distribution
