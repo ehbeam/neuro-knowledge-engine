@@ -1,5 +1,0 @@
-Traceback (most recent call last):
-  File "dsm_reverse.py", line 4, in <module>
-    prediction.train_classifier.run('dsm', 'reverse', suffix='_opsim')
-AttributeError: 'function' object has no attribute 'run'
-srun: error: sh-101-32: task 0: Exited with exit code 1

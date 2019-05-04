@@ -21,6 +21,13 @@ def doc_mean_thres(df):
 	return df_bin
 
 
+def load_coordinates():
+	atlas_labels = pd.read_csv("../../data/brain/labels.csv")
+	activations = pd.read_csv("../../data/brain/coordinates.csv", index_col=0)
+	activations = activations[atlas_labels["PREPROCESSED"]]
+	return activations
+
+
 def load_doc_term_matrix(version=190325, binarize=True):
 	dtm = pd.read_csv("../../data/text/dtm_{}.csv.gz".format(version), compression="gzip", index_col=0)
 	if binarize:
@@ -36,14 +43,12 @@ def load_framework(framework, suffix=""):
 	return lists, circuits
 
 
-def score_lists(lists, dtm, label_var="LABEL"):
-	dtm = pd.DataFrame(binarize(dtm, threshold=0), index=dtm.index, columns=dtm.columns)
+def score_lists(lists, dtm_bin, label_var="DOMAIN"):
 	labels = OrderedDict.fromkeys(lists[label_var])
-	list_counts = pd.DataFrame(index=dtm.index, columns=labels)
+	list_counts = pd.DataFrame(index=dtm_bin.index, columns=labels)
 	for label in list_counts.columns:
 		tkns = lists.loc[lists[label_var] == label, "TOKEN"]
-		tkns = [token for token in tkns if token in dtm.columns]
-		list_counts[label] = dtm[tkns].sum(axis=1)
+		list_counts[label] = dtm_bin[tkns].sum(axis=1)
 	list_scores = doc_mean_thres(list_counts)
 	return list_scores
 
@@ -70,32 +75,32 @@ def search_grid(X, Y, param_grid, scoring="roc_auc", n_iter=25):
 	return grid_search
 
 
-def train_classifier(framework, direction, suffix=""):
+def train_classifier(framework, direction, suffix="", version=190325):
 
-	fit_file = "../fits/{}_{}.p".format(framework, direction)
+	fit_file = "../fits_dev/{}_{}.p".format(framework, direction)
 	if not os.path.isfile(fit_file):
 
-		act_bin = pd.read_csv("../../data/brain/coordinates.csv", index_col=0)
+		act_bin = load_coordinates()
 		dtm_bin = load_doc_term_matrix(version=version, binarize=True)
 
 		train = [int(pmid.strip()) for pmid in open("../../data/splits/train.txt")]
 
 		lists, circuits = load_framework(framework, suffix=suffix)
-		scores = score_lists(lists, dtm, label_var=level.upper())
+		scores = score_lists(lists, dtm_bin)
 			
-		param_grid = {"estimator__hidden_layer_sizes": [tuple([50]*n_layers) for n_layers in range(1,6)],
-					  "estimator__activation": ["logistic", "tanh", "relu"],
-					  "estimator__solver": ["lbfgs", "sgd", "adam"],
-					  "estimator__alpha": [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1],
+		param_grid = {"estimator__hidden_layer_sizes": [(50), (50, 50)],
+					  "estimator__activation": ["logistic"],
+					  "estimator__solver": ["adam"],
+					  "estimator__alpha": [1e-8, 1e-4, 1e-2],
 					  "estimator__random_state": [42], 
-					  "estimator__max_iter": [100]}
+					  "estimator__max_iter": [20]}
 
 		if direction == "forward":
 			cv_results = search_grid(scores.loc[train], act_bin.loc[train], param_grid, 
-									 scoring="roc_auc", n_iter=100)
-		elif directon == "reverse":
+									 scoring="roc_auc", n_iter=6)
+		elif direction == "reverse":
 			cv_results = search_grid(act_bin.loc[train], scores.loc[train], param_grid, 
-									 scoring="roc_auc", n_iter=100)
+									 scoring="roc_auc", n_iter=6)
 
 		top_clf = cv_results.best_estimator_
 		pickle.dump(top_clf, open(fit_file, "wb"), protocol=2)

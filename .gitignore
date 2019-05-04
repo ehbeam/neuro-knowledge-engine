@@ -9,3 +9,6 @@ CQHDimensionalPhenotyper.py
 en-verbs.txt
 word_forms.py
 Yeo_JNeurophysiol11_MNI152/
+
+# Ignore sequestered files
+in_progress/

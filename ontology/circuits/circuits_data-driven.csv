@@ -1,4 +1,4 @@
-,EMOTION,ANTICIPATION,COGNITION,VISION,MANIPULATION,MEANING,LANGUAGE
+,MEMORY,REWARD,COGNITION,VISION,MANIPULATION,MEANING,LANGUAGE
 left_frontal_pole,0.0,0.0,1.0,0.0,0.0,0.0,0.0
 left_insular_cortex,0.0,0.0,1.0,0.0,0.0,0.0,0.0
 left_superior_frontal_gyrus,0.0,0.0,0.0,0.0,1.0,0.0,0.0
@@ -7,7 +7,7 @@ left_inferior_frontal_gyrus_pars_triangularis,0.0,0.0,0.0,0.0,1.0,0.0,0.0
 left_inferior_frontal_gyrus_pars_opercularis,0.0,0.0,0.0,0.0,1.0,0.0,0.0
 left_precentral_gyrus,0.0,0.0,0.0,0.0,1.0,0.0,0.0
 left_temporal_pole,0.0,0.0,0.0,0.0,0.0,0.0,1.0
-left_superior_temporal_gyrus_anterior_division,0.0,0.0,0.0,0.0,0.0,0.0,1.0
+left_superior_temporal_gyrus_anterior_division,0.0,0.0,0.0,0.0,0.0,1.0,0.0
 left_superior_temporal_gyrus_posterior_division,0.0,0.0,0.0,0.0,0.0,0.0,1.0
 left_middle_temporal_gyrus_anterior_division,0.0,0.0,0.0,0.0,0.0,1.0,0.0
 left_middle_temporal_gyrus_posterior_division,0.0,0.0,0.0,0.0,0.0,1.0,0.0
@@ -93,7 +93,7 @@ right_parahippocampal_gyrus_anterior_division,1.0,0.0,0.0,0.0,0.0,0.0,0.0
 right_parahippocampal_gyrus_posterior_division,1.0,0.0,0.0,0.0,0.0,0.0,0.0
 right_lingual_gyrus,0.0,0.0,0.0,1.0,0.0,0.0,0.0
 right_temporal_fusiform_cortex_anterior_division,1.0,0.0,0.0,0.0,0.0,0.0,0.0
-right_temporal_fusiform_cortex_posterior_division,0.0,0.0,0.0,0.0,0.0,1.0,0.0
+right_temporal_fusiform_cortex_posterior_division,1.0,0.0,0.0,0.0,0.0,0.0,0.0
 right_temporal_occipital_fusiform_cortex,0.0,0.0,0.0,1.0,0.0,0.0,0.0
 right_occipital_fusiform_gyrus,0.0,0.0,0.0,1.0,0.0,0.0,0.0
 right_frontal_operculum_cortex,0.0,0.0,1.0,0.0,0.0,0.0,0.0

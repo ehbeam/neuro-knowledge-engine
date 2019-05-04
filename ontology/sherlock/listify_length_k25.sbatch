@@ -3,8 +3,8 @@
 #SBATCH --job-name=k25_listlen
 #SBATCH --output=logs/k25_listlen.%j.out
 #SBATCH --error=logs/k25_listlen.%j.err
-#SBATCH --time=01-20:00:00
-#SBATCH -p aetkin
+#SBATCH --time=02-00:00:00
+#SBATCH -p normal
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=ebeam@stanford.edu
 

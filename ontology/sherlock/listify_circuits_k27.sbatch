@@ -3,7 +3,7 @@
 #SBATCH --job-name=k27_ncircuits
 #SBATCH --output=logs/k27_ncircuits.%j.out
 #SBATCH --error=logs/k27_ncircuits.%j.err
-#SBATCH --time=00-00:30:00
+#SBATCH --time=01-00:00:00
 #SBATCH -p normal
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=ebeam@stanford.edu

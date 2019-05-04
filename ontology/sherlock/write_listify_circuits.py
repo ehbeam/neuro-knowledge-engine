@@ -14,7 +14,7 @@ for k in range(2, 41):
              "#SBATCH --job-name=k{:02d}_ncircuits".format(k),
              "#SBATCH --output=logs/k{:02d}_ncircuits.%j.out".format(k),
              "#SBATCH --error=logs/k{:02d}_ncircuits.%j.err".format(k),
-             "#SBATCH --time=00-00:30:00",
+             "#SBATCH --time=01-00:00:00",
              "#SBATCH -p normal",
              "#SBATCH --mail-type=FAIL",
              "#SBATCH --mail-user=ebeam@stanford.edu\n",
