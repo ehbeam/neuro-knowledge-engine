@@ -12,3 +12,7 @@ Yeo_JNeurophysiol11_MNI152/
 
 # Ignore sequestered files
 in_progress/
+
+# Ignore byte code
+.pyc
+__pycache__
