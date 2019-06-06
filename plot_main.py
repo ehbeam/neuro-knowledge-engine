@@ -96,8 +96,8 @@ for k in circuit_counts:
 			lists = lists.append(R)
 		lists.to_csv(outfile, index=None)
 
-Select optimal number of words per domain
-Note: Run on Sherlock, generating ontology/lists/*_oplen.csv
+# Select optimal number of words per domain
+# Note: Run on Sherlock, generating ontology/lists/*_oplen.csv
 
 # Select optimal number of domains
 import torch, math
@@ -594,6 +594,9 @@ gen_dx = {"data-driven": [0.39, 0.38, 0.37, 0.39, 0.39, 0.38],
 mod_ds = {"data-driven": 0.09, "rdoc": 0.09, "dsm": 0.13}
 gen_ds = {"data-driven": 0.11, "rdoc": 0.09, "dsm": 0.13}
 
+# Significance level for statistical comparison tests
+alpha = 0.001
+
 for framework in frameworks:
 
 	print("\n-- Processing {} framework --".format(framework))
@@ -736,7 +739,7 @@ for framework in frameworks:
 	stats = utilities.compare_to_null(df_null, df, domains, n_iter, alpha=alpha)
 
 	modularity.plot_violins(framework, domains, stats, df_null, df_obs, palettes[framework], 
-				 			dx=mod_dx[framework], ds=mod_ds[framework], alphas=[0,0,0], interval=0.999, print_fig=False,
+				 			dx=mod_dx[framework], ds=mod_ds[framework], alphas=[0], interval=0.999, print_fig=False,
 				 			ylim=[0.75,1.75], yticks=[0.75,1,1.25,1.5,1.75], font=arial, path="modularity/")
 
 
@@ -794,17 +797,14 @@ for framework in frameworks:
 	stats = utilities.compare_to_null(df_null, df, domains, n_iter, alpha=alpha)
 
 	archetype.plot_violins(framework, domains, stats, df_null, df_obs, palettes[framework], 
-			 	 		   dx=gen_dx[framework], ds=gen_ds[framework], alphas=alphas, interval=0.999, print_fig=False,
+			 	 		   dx=gen_dx[framework], ds=gen_ds[framework], alphas=[0], interval=0.999, print_fig=False,
 			 	 		   ylim=[-0.25,0.75], yticks=[-0.25,0,0.25,0.5,0.75], font=arial, path="archetype/")
 
 
 ### Article partitions ###
 print("\nPlotting MDS of article partitions")
 
-import matplotlib.pyplot as plt
-
-vecs = act_bin.copy()
-vecs[words] = dtm_bin[words]
+from mds import mds
 
 partitions = {framework: pd.read_csv("partition/data/doc2dom_{}.csv".format(
 									 framework), index_col=0, header=None) - 1.0 
@@ -812,8 +812,7 @@ partitions = {framework: pd.read_csv("partition/data/doc2dom_{}.csv".format(
 
 colors = {}
 for framework in frameworks:
-	colors[framework] = [palettes[framework][int(partitions[framework].loc[pmid])] 
-						 for pmid in vecs.index]
+	colors[framework] = [palettes[framework][int(partitions[framework].loc[pmid])] for pmid in pmids]
 
 shapes = {"data-driven": ["o", "v", "^", ">", "<", "s"],
 		  "rdoc": ["o", "v", "^", ">", "<", "s"],
@@ -821,14 +820,18 @@ shapes = {"data-driven": ["o", "v", "^", ">", "<", "s"],
 
 markers = {}
 for framework in frameworks:
-	markers[framework] = [shapes[framework][int(partitions[framework].loc[pmid])] 
-						  for pmid in vecs.index]
+	markers[framework] = [shapes[framework][int(partitions[framework].loc[pmid])] for pmid in pmids]
 
-X = pd.read_csv(outfile, index_col=0, header=0).values
+mds_metric = True
+eps = 0.001
+max_iter = 5000
+
+mds_file = "mds/data/mds_metric{}_eps{}_iter{}.csv".format(int(mds_metric), eps, max_iter)
+X = pd.read_csv(mds_file, index_col=0, header=0).values
 
 for framework in frameworks:
-	plot_mds(X, framework, colors, markers, metric=True, eps=0.001, max_iter=5000, 
-			 path="mds/", print_fig=False)
+	mds.plot_mds(X, framework, colors, markers, metric=mds_metric, eps=eps, max_iter=max_iter, 
+			 	 path="mds/", print_fig=False)
 
 
 
