@@ -6,18 +6,18 @@ np.random.seed(42)
 
 import sys
 sys.path.append("..")
-from utilities import *
+import utilities
 
 
 def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="arche",
 				 dx=[], dy=0.06, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001],
-				 ylim=[-0.1, 0.85], yticks=[0, 0.25, 0.5, 0.75]):
+				 ylim=[-0.1, 0.85], yticks=[0, 0.25, 0.5, 0.75], print_fig=True, 
+				 font=utilities.arial, path=""):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import cm, font_manager, rcParams
 
-	font = font_manager.FontProperties(fname=arial, size=20)
-	font_lg = font_manager.FontProperties(fname=arial, size=24)
+	font_prop = font_manager.FontProperties(fname=font, size=24)
 	rcParams["axes.linewidth"] = 1.5
 
 	# Set up figure
@@ -44,8 +44,7 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="arch
 		dys = dy * np.array([0, 1, 2])
 		for alpha, y in zip(alphas, dys):
 			if df["FDR"][i] < alpha:
-				plt.text(i-ds, max(data) + y, "*", 
-						 fontproperties=font_lg)
+				plt.text(i-ds, max(data) + y, "*", fontproperties=font_prop)
 
 	# Confidence interval of null distribution
 	n_iter = df_null.shape[1]
@@ -57,7 +56,7 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="arch
 
 	# Set plot parameters
 	plt.xticks(range(len(domains)), [""]*len(domains))
-	plt.yticks(yticks, fontproperties=font)
+	plt.yticks(yticks, fontproperties=font_prop)
 	plt.xlim([-0.75, len(domains)-0.35])
 	plt.ylim(ylim)
 	for side in ["right", "top"]:
@@ -66,6 +65,57 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="arch
 	ax.yaxis.set_tick_params(width=1.5, length=7)
 
 	# Export figure
-	plt.savefig("figures/{}_{}_{}iter.png".format(
-				metric, framework, n_iter), dpi=250, bbox_inches="tight")
-	plt.show()
+	plt.savefig("{}figures/{}_{}_{}iter.png".format(
+				path, metric, framework, n_iter), dpi=250, bbox_inches="tight")
+	if print_fig:
+		plt.show()
+	plt.close()
+
+
+def plot_framework_comparison(boot, obs, n_iter=1000, dx=0.38, ylim=[0.4,0.65], yticks=[], 
+							  print_fig=True, font=utilities.arial, path=""):
+	
+	import matplotlib.pyplot as plt
+	from matplotlib import font_manager, rcParams
+
+	font_prop = font_manager.FontProperties(fname=font, size=24)
+	rcParams["axes.linewidth"] = 1.5
+
+	# Set up figure
+	fig = plt.figure(figsize=(2.1, 2.1))
+	ax = fig.add_axes([0,0,1,1])
+
+	i = 0
+	labels = []
+	for fw, dist in boot.items():
+		labels.append(utilities.names[fw])
+		dist_avg = np.mean(dist, axis=0)
+		macro_avg = np.mean(obs[fw]["OBSERVED"])
+		plt.plot([i-dx, i+dx], [macro_avg, macro_avg], 
+				 c="gray", alpha=1, lw=2, zorder=-1)
+		v = ax.violinplot(sorted(dist_avg), positions=[i], 
+						  showmeans=False, showmedians=False, widths=0.85)
+		for pc in v["bodies"]:
+			pc.set_facecolor("gray")
+			pc.set_edgecolor("gray")
+			pc.set_linewidth(2)
+			pc.set_alpha(0.5)
+		for line in ["cmaxes", "cmins", "cbars"]:
+			v[line].set_edgecolor("none")
+		i += 1
+
+	ax.set_xticks(range(len(boot.keys())))
+	ax.set_xticklabels([], rotation=60, ha="right")
+	plt.xticks(fontproperties=font_prop)
+	plt.yticks(yticks, fontproperties=font_prop)
+	plt.xlim([-0.75, len(boot.keys())-0.25])
+	plt.ylim(ylim)
+	for side in ["right", "top"]:
+		ax.spines[side].set_visible(False)
+	ax.xaxis.set_tick_params(width=1.5, length=7)
+	ax.yaxis.set_tick_params(width=1.5, length=7)
+	plt.savefig("{}figures/arche_{}iter.png".format(path, n_iter), 
+				dpi=250, bbox_inches="tight")
+	if print_fig:
+		plt.show()
+	plt.close()

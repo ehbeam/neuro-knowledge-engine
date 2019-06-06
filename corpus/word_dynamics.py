@@ -51,7 +51,7 @@ def load_data_from_meta(file):
 	return year2pmids
 
 
-def extract_freq_by_year(words, year2pmids, dir):
+def extract_freq_by_year(words, year2pmids, dirs):
 
 	years = sorted(list(set(year2pmids.keys())))
 	freq = {word: {year: 0.0 for year in years} for word in words}
@@ -59,33 +59,36 @@ def extract_freq_by_year(words, year2pmids, dir):
 
 	for year in years:
 		for pmid in year2pmids[year]:
-			infile = "{}/{}.txt".format(dir, int(pmid))
-			text = open(infile, "r").read()
-			for ngram in ngrams:
-				text = text.replace(ngram, ngram.replace(" ", "_"))
-			text = text.split()
-			for word in words:
-				if word.replace(" ", "_") in text:
-					freq[word][year] += 1.0 / len(year2pmids[year])
+			for dir in dirs:
+				infile = "{}/{}.txt".format(dir, int(pmid))
+				if os.path.isfile(infile):
+					text = open(infile, "r").read()
+					for ngram in ngrams:
+						text = text.replace(ngram, ngram.replace(" ", "_"))
+					text = text.split()
+					for word in words:
+						if word.replace(" ", "_") in text:
+							freq[word][year] += 1.0 / len(year2pmids[year])
+					continue
 	return freq
 
 
-def boot_freq_by_year(words, year2pmids, dir, 
-					  n_iter=5000, seed=42, verbose=False):
+def boot_freq_by_year(words, year2pmids, dirs, 
+					  n_iter=5000, seed=42, verbose=True):
 	
 	np.random.seed(seed)
 
 	freq_boot = {}
 	for i in range(n_iter):
-		if verbose:
+		if verbose and i % 100 == 0:
 			print("Bootstrap iteration {}".format(i))
 		year2pmids_sample = {year: np.random.choice(list(pmids), 
 							 size=len(pmids), replace=True) for year, pmids in year2pmids.items()}
-		freq_boot[i] = extract_freq_by_year(words, year2pmids_sample, dir)
+		freq_boot[i] = extract_freq_by_year(words, year2pmids_sample, dirs)
 	return freq_boot
 
 
-def plot_freq_over_years(freq, freq_boot, file):
+def plot_freq_over_years(freq, file, freq_boot=[], plot_boot=False):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager
@@ -105,20 +108,23 @@ def plot_freq_over_years(freq, freq_boot, file):
 	labels = ["DSM", "RDoC", "Machine Learning"]
 	lty = ["dotted", "dashed", "solid"]
 	
-	iters = sorted(list(freq_boot.keys()))
-	boots = [{year: [] for year in years} for word in words]
-	for i, word in enumerate(words):
-		for n in iters:
-			for year in years:
-				boots[i][year].append(freq_boot[n][word][year])
+	if plot_boot:
+		iters = sorted(list(freq_boot.keys()))
+		boots = [{year: [] for year in years} for word in words]
+		for i, word in enumerate(words):
+			for n in iters:
+				for year in years:
+					boots[i][year].append(freq_boot[n][word][year])
 
 	for i, word in enumerate(words):
 		plt.plot(years, [freq[word][y] for y in years], label=labels[i],
 				linestyle=lty[i], linewidth=2, color="black")
-		lower_i = [sorted(boots[i][year])[int(len(iters)*.05)] for year in years]
-		upper_i = [sorted(boots[i][year])[int(len(iters)*.95)] for year in years]
-		plt.fill_between(years, y1=lower_i, y2=upper_i, 
-						 color="gray", alpha=0.2)
+
+		if plot_boot:
+			lower_i = [sorted(boots[i][year])[int(len(iters)*.05)] for year in years]
+			upper_i = [sorted(boots[i][year])[int(len(iters)*.95)] for year in years]
+			plt.fill_between(years, y1=lower_i, y2=upper_i, 
+							 color="gray", alpha=0.2)
 		
 	plt.xticks(fontproperties=prop_lg)
 	plt.yticks(fontproperties=prop_lg)
@@ -127,7 +133,7 @@ def plot_freq_over_years(freq, freq_boot, file):
 	ax.yaxis.set_tick_params(width=2, length=5)
 
 	ax.set_xticks(range(2000, 2020, 5))
-	plt.ylim([-0.003,0.066])
+	plt.ylim([-0.003,0.12])
 
 	plt.xlabel("Year", fontproperties=prop_xlg)
 	plt.ylabel("Proportion of articles", fontproperties=prop_xlg)
@@ -143,12 +149,34 @@ def plot_freq_over_years(freq, freq_boot, file):
 
 	plt.savefig("figures/{}.png".format(file), dpi=250, bbox_inches="tight")
 
-
+# Words to plot
 words = ["dsm", "rdoc", "machine learning"]
-year2pmids = load_data_from_meta("../data/metadata.csv")
+
+# Directory for texts
 dir = "../../nlp/corpus"
-freq = extract_freq_by_year(words, year2pmids, dir)
-freq_boot = boot_freq_by_year(words, year2pmids, dir, n_iter=5000, verbose=True)
-plot_freq_over_years(freq, freq_boot, "cog_words_by_year")
+
+# General neuroimaging corpus
+print("\nPlotting words in general neuroimaging corpus")
+year2pmids = load_data_from_records("../../pubmed/query_190428/records")
+freq = extract_freq_by_year(words, year2pmids, [dir])
+boot = boot_freq_by_year(words, year2pmids, [dir], 
+					  	 n_iter=1000, seed=42, verbose=True)
+plot_freq_over_years(freq, "gen_words_by_year", freq_boot=boot, plot_boot=True)
+
+# Psychiatric neuroimaging corpus
+print("\nPlotting words in psychiatric neuroimaging corpus")
+year2pmids = load_data_from_records("../../dsm/query_190428/records")
+freq = extract_freq_by_year(words, year2pmids, [dir, "../../dsm/corpus"])
+boot = boot_freq_by_year(words, year2pmids, [dir, "../../dsm/corpus"], 
+					  	 n_iter=1000, seed=42, verbose=True)
+plot_freq_over_years(freq, "psy_words_by_year", freq_boot=boot, plot_boot=True)
+
+# Articles with coordinate data
+print("\nPlotting words in neuroimaging corpus with coordinates")
+year2pmids = load_data_from_meta("../data/metadata.csv")
+freq = extract_freq_by_year(words, year2pmids, [dir])
+boot = boot_freq_by_year(words, year2pmids, [dir], 
+					  	 n_iter=1000, seed=42, verbose=True)
+plot_freq_over_years(freq, "cog_words_by_year", freq_boot=boot, plot_boot=True)
 
 

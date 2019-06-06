@@ -1,12 +1,19 @@
 #!/usr/bin/python
 
+import os, math
 import pandas as pd
 import numpy as np
-from sklearn.neural_network import MLPClassifier
-from sklearn.multiclass import OneVsRestClassifier
-from sklearn.model_selection import RandomizedSearchCV
+np.random.seed(42)
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.autograd import Variable
+import torch.optim as optim
+torch.manual_seed(42)
+
 from sklearn.metrics import roc_auc_score
-from time import time
+from sklearn.model_selection import ParameterSampler
 
 
 def doc_mean_thres(df):
@@ -38,86 +45,198 @@ def load_raw_domains(k):
   return lists, circuits
 
 
-def report(results, n_top=3):
-    for i in range(1, n_top + 1):
-        candidates = np.flatnonzero(results["rank_test_score"] == i)
-        for candidate in candidates:
-            print("-" * 30 + "\nModel rank: {0}".format(i))
-            print("Cross-validated score: {0:.4f} (std: {1:.4f})".format(
-                  results["mean_test_score"][candidate],
-                  results["std_test_score"][candidate]))
-            print("Parameters: {0}".format(results["params"][candidate]))
+def numpy2torch(data):
+  inputs, labels = data
+  inputs = Variable(torch.from_numpy(inputs.T).float())
+  labels = Variable(torch.from_numpy(labels.T).float())
+  return inputs, labels
 
 
-def search_grid(X, Y, param_grid, scoring="roc_auc", n_iter=25):
-    clf = OneVsRestClassifier(MLPClassifier())
-    grid_search = RandomizedSearchCV(clf, param_grid, n_iter=n_iter, scoring=scoring, cv=5, n_jobs=5)
-    start = time()
-    grid_search.fit(X, Y)
-    print("\nGridSearchCV took %.2f seconds for %d candidate parameter settings\n"
-          % (time() - start, len(grid_search.cv_results_["params"])))
-    report(grid_search.cv_results_)
-    return grid_search
+def reset_weights(m):
+    if isinstance(m, nn.Linear):
+        m.reset_parameters()
+
+
+class Net(nn.Module):
+  def __init__(self, n_input=0, n_output=0, n_hid=100, p_dropout=0.5):
+    super(Net, self).__init__()
+    self.fc1 = nn.Linear(n_input, n_hid)
+    self.fc2 = nn.Linear(n_hid, n_hid)
+    self.fc3 = nn.Linear(n_hid, n_hid)
+    self.fc4 = nn.Linear(n_hid, n_hid)
+    self.fc5 = nn.Linear(n_hid, n_hid)
+    self.dropout1 = nn.Dropout(p=p_dropout),
+    self.fc6 = nn.Linear(n_hid, n_hid)
+    self.dropout2 = nn.Dropout(p=p_dropout),
+    self.fc7 = nn.Linear(n_hid, n_hid)
+    self.dropout3 = nn.Dropout(p=p_dropout),
+    self.fc8 = nn.Linear(n_hid, n_output)
+    
+    # Xavier initialization for weights
+    for fc in [self.fc1, self.fc2, self.fc3, self.fc4,
+           self.fc5, self.fc6, self.fc7, self.fc8]:
+      nn.init.xavier_uniform_(fc.weight)
+
+  def forward(self, x):
+    x = F.relu(self.fc1(x))
+    x = F.relu(self.fc2(x))
+    x = F.relu(self.fc3(x))
+    x = F.relu(self.fc4(x))
+    x = F.relu(self.fc5(x))
+    x = F.dropout(x)
+    x = F.relu(self.fc6(x))
+    x = F.dropout(x)
+    x = F.relu(self.fc7(x))
+    x = F.dropout(x)
+    x = torch.sigmoid(self.fc8(x))
+    return x
+
+
+def optimize_hyperparameters(param_list, train_set, val_set, n_epochs=100):
+  
+  criterion = F.binary_cross_entropy
+  inputs_val, labels_val = numpy2torch(val_set[0])
+  op_idx, op_params, op_score_val, op_state_dict, op_loss = 0, 0, 0, 0, 0
+  
+  for params in param_list:
+    
+    print("-" * 75)
+    print("   ".join(["{} {:6.5f}".format(k.upper(), v) for k, v in params.items()]))
+    print("-" * 75 + "\n")
+    
+    # Initialize variables for this set of parameters
+    n_input = train_set[0][0].shape[0]
+    n_output = train_set[0][1].shape[0]
+    net = Net(n_input=n_input, n_output=n_output, 
+      n_hid=params["n_hid"], p_dropout=params["p_dropout"])
+    optimizer = optim.Adam(net.parameters(),
+                 lr=params["lr"], weight_decay=params["weight_decay"])
+    net.apply(reset_weights)
+    running_loss = []
+
+    # Loop over the dataset multiple times
+    for epoch in range(n_epochs): 
+      for data in train_set:
+
+        # Get the inputs
+        inputs, labels = numpy2torch(data)
+
+        # Zero the parameter gradients
+        optimizer.zero_grad()
+
+        # Forward + backward + optimize
+        outputs = net(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+      
+      # Update the running loss
+      running_loss += [loss.item()]
+      if epoch % (n_epochs/5) == (n_epochs/5) - 1:
+        print("   Epoch {:3d}\tLoss {:6.6f}".format(epoch + 1, running_loss[-1] / 100)) 
+    
+    # Evaluate on the validation set
+    with torch.no_grad():
+      preds_val = net(inputs_val).float()
+    score_val = roc_auc_score(labels_val, preds_val, average="macro")
+    print("\n   Validation Set ROC-AUC {:6.4f}\n".format(score_val))
+    
+    # Update outputs if this model is the best so far
+    if score_val > op_score_val:
+      print("   Best so far!\n")
+      op_score_val = score_val
+      op_state_dict = net.state_dict()
+      op_params = params
+      op_loss = running_loss
+
+  return op_score_val
+
+
+def load_mini_batches(X, Y, split, mini_batch_size=64, seed=0, reshape_labels=False):
+  
+  np.random.seed(seed)      
+  m = len(split) # Number of training examples
+  mini_batches = []
+
+  # Split the data
+  X = X.loc[split].T.values
+  Y = Y.loc[split].T.values
+    
+  # Shuffle (X, Y)
+  permutation = list(np.random.permutation(m))
+  shuffled_X = X[:, permutation]
+  shuffled_Y = Y[:, permutation]
+  if reshape_labels:
+    shuffled_Y = shuffled_Y.reshape((1,m))
+
+  # Partition (shuffled_X, shuffled_Y), except the end case
+  num_complete_minibatches = math.floor(m / mini_batch_size) # Mumber of mini batches of size mini_batch_size in your partitionning
+  for k in range(0, num_complete_minibatches):
+    mini_batch_X = shuffled_X[:, k * mini_batch_size : (k+1) * mini_batch_size]
+    mini_batch_Y = shuffled_Y[:, k * mini_batch_size : (k+1) * mini_batch_size]
+    mini_batch = (mini_batch_X, mini_batch_Y)
+    mini_batches.append(mini_batch)
+  
+  # Handle the end case (last mini-batch < mini_batch_size)
+  if m % mini_batch_size != 0:
+    mini_batch_X = shuffled_X[:, -(m % mini_batch_size):]
+    mini_batch_Y = shuffled_Y[:, -(m % mini_batch_size):]
+    mini_batch = (mini_batch_X, mini_batch_Y)
+    mini_batches.append(mini_batch)
+  
+  return mini_batches
 
 
 def optimize_list_len(k):
 
-    np.random.seed(42)
+    # Load the data splits
+    splits = {}
+    for split in ["train", "validation"]:
+      splits[split] = [int(pmid.strip()) for pmid in open("../../data/splits/{}.txt".format(split), "r").readlines()]
 
     act_bin = load_coordinates()
     dtm_bin = load_doc_term_matrix(version=190325, binarize=True)
 
-    train = [int(pmid.strip()) for pmid in open("../../data/splits/train.txt")]
-    val = [int(pmid.strip()) for pmid in open("../../data/splits/validation.txt")]
-
     lists, circuits = load_raw_domains(k)
     
-    param_grid = {"estimator__hidden_layer_sizes": [(50,50)],
-                  "estimator__activation": ["logistic"],
-                  "estimator__solver": ["adam"],
-                  "estimator__alpha": [1e-5],
-                  "estimator__random_state": [42], 
-                  "estimator__max_iter": [10]}
+    # Specify the hyperparameters for the randomized grid search
+    param_grid = {"lr": [0.001],
+                  "weight_decay": [0.001],
+                  "n_hid": [100],
+                  "p_dropout": [0.1]}
+    param_list = list(ParameterSampler(param_grid, n_iter=1, random_state=42))
+    batch_size = 1024
+    n_epochs = 100
 
     list_lens = range(5, 26)
     op_lists = pd.DataFrame()
     
     for circuit in range(1, k+1):
 
+        print("-" * 100)
+        print("Fitting models for domain {:02d}".format(circuit))
         forward_scores, reverse_scores = [], []
         structures = circuits.loc[circuits["CLUSTER"] == circuit, "STRUCTURE"]
 
         for list_len in list_lens:
-            print("-" * 80 + "\n" + "-" * 80)
+            print("-" * 85)
             print("Fitting models for lists of length {:02d}".format(list_len))
             words = lists.loc[lists["CLUSTER"] == circuit, "TOKEN"][:list_len]
 
-            # try:
-            #     # forward_cv = search_grid(dtm_bin.loc[train, words], act_bin.loc[train, structures], 
-            #     #                          param_grid, n_iter=1)
-            #     # forward_clf = forward_cv.best_estimator_
-            forward_clf = OneVsRestClassifier(MLPClassifier(hidden_layer_sizes=(50,50), activation="logistic", solver="adam", alpha=1e-5, random_state=42, max_iter=10))
-            forward_clf.fit(dtm_bin.loc[train, words], act_bin.loc[train, structures])
-            forward_preds = forward_clf.predict(dtm_bin.loc[val, words])
-            forward_scores.append(roc_auc_score(act_bin.loc[val, structures], forward_preds))
-            # except:
-            #     print("Unable to score forward models for length {:02d}".format(list_len))
-            #     forward_scores.append(0.0)
-            
-            # try:
-            #     # reverse_cv = search_grid(act_bin.loc[train, structures], dtm_bin.loc[train, words], 
-            #     #                          param_grid, n_iter=1)
-            #     # reverse_clf = reverse_cv.best_estimator_
-            reverse_clf = OneVsRestClassifier(MLPClassifier(hidden_layer_sizes=(50,50), activation="logistic", solver="adam", alpha=1e-5, random_state=42, max_iter=10))
-            reverse_clf.fit(act_bin.loc[train, structures], dtm_bin.loc[train, words])
-            reverse_preds = reverse_clf.predict(act_bin.loc[val, structures])
-            reverse_scores.append(roc_auc_score(dtm_bin.loc[val, words], reverse_preds))
-            # except:
-            #     print("Unable to score reverse models for length {:02d}".format(list_len))
-            #     reverse_scores.append(0.0)
+            # Optimize forward inference classifier 
+            train_set_f = load_mini_batches(dtm_bin[words], act_bin[structures], splits["train"], mini_batch_size=batch_size, seed=42)
+            val_set_f = load_mini_batches(dtm_bin[words], act_bin[structures], splits["validation"], mini_batch_size=len(splits["validation"]), seed=42)
+            op_val_f = optimize_hyperparameters(param_list, train_set_f, val_set_f, n_epochs=n_epochs)
+            forward_scores.append(op_val_f)
+
+            # Optimize reverse inference classifier
+            train_set_r = load_mini_batches(act_bin[structures], dtm_bin[words], splits["train"], mini_batch_size=batch_size, seed=42)
+            val_set_r = load_mini_batches(act_bin[structures], dtm_bin[words], splits["validation"], mini_batch_size=len(splits["validation"]), seed=42)
+            op_val_r = optimize_hyperparameters(param_list, train_set_r, val_set_r, n_epochs=n_epochs)
+            reverse_scores.append(op_val_r)
         
         scores = [(forward_scores[i] + reverse_scores[i])/2.0 for i in range(len(forward_scores))]
-        print("-" * 80)
+        print("-" * 85)
         print("Mean ROC-AUC scores: {}".format(scores))
         op_len = list_lens[scores.index(max(scores))]
         print("-" * 100)

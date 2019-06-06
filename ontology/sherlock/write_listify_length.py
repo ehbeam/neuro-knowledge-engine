@@ -2,7 +2,7 @@
 
 import os, shutil
 
-for k in range(2, 41):
+for k in range(2, 26):
     
     comm = "listify_length.optimize_list_len({})".format(k)
     pyfile = open("listify_length_k{:02d}.py".format(k), "w+")
@@ -14,12 +14,12 @@ for k in range(2, 41):
              "#SBATCH --job-name=k{:02d}_listlen".format(k),
              "#SBATCH --output=logs/k{:02d}_listlen.%j.out".format(k),
              "#SBATCH --error=logs/k{:02d}_listlen.%j.err".format(k),
-             "#SBATCH --time=02-00:00:00",
+             "#SBATCH --time=01-00:00:00",
              "#SBATCH -p normal",
              "#SBATCH --mail-type=FAIL",
              "#SBATCH --mail-user=ebeam@stanford.edu\n",
-             "module load python/3.6",
-             "srun python listify_length_k{:02d}.py".format(k)]
+             "module load python/3.6 py-pytorch/1.0.0_py36",
+             "srun python3 listify_length_k{:02d}.py".format(k)]
     for line in lines:
         bashfile.write(line + "\n")
     bashfile.close()
