@@ -368,7 +368,7 @@ def term_degree_centrality(i, lists, circuits, dtm, ids, reweight=False):
 
 
 def plot_wordclouds(framework, domains, lists, dtm, path="", 
-					font_path=arial, print_fig=True):
+					font_path=arial, print_fig=True, width=550):
 	
 	from wordcloud import WordCloud
 	import matplotlib.pyplot as plt
@@ -385,7 +385,7 @@ def plot_wordclouds(framework, domains, lists, dtm, path="",
 
 		cloud = WordCloud(background_color="rgba(255, 255, 255, 0)", mode="RGB", 
 						  max_font_size=100, prefer_horizontal=1, scale=20, margin=3,
-						  width=550, height=15*len(tkns)+550, font_path=arial, 
+						  width=width, height=15*len(tkns)+550, font_path=arial, 
 						  random_state=42).generate_from_frequencies(zip(tkns, freq))
 
 		fig = plt.figure()

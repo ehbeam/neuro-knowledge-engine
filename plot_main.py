@@ -5,14 +5,17 @@ import pandas as pd
 import numpy as np
 np.random.seed(42)
 
+import utilities
+
+from collections import OrderedDict
+from statsmodels.stats.multitest import multipletests
+
 
 ################################################
 ############### 0. Load the data ###############
 ################################################
 
 print("\n--- Loading the data ---")
-
-import utilities
 
 vsm_version = 190428 # Version of GloVe embeddings
 dtm_version = 190325 # Version of document-term matrix
@@ -180,7 +183,7 @@ lists.to_csv("ontology/lists/lists_data-driven.csv", index=None)
 
 # Plot the term lists
 print("\nPlotting word clouds")
-ontology.plot_wordclouds("data-driven", names, lists, dtm_bin_cog, 
+ontology.plot_wordclouds("data-driven", names, lists, dtm_bin_cog, width=600,
 						 path="ontology/", font_path=arial, print_fig=False)
 
 # Export the named circuits
@@ -206,9 +209,6 @@ utilities.map_plane(circuit_mat, atlas, "ontology/figures/circuits/data-driven",
 ################################################
 ###### 2. Generate the expert frameworks #######
 ################################################
-
-from collections import OrderedDict
-from statsmodels.stats.multitest import multipletests
 
 n_iter_fw = 10000 # Iterations for seed similarity and PPMI circuits
 

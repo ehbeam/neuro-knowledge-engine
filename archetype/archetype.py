@@ -9,7 +9,7 @@ sys.path.append("..")
 import utilities
 
 
-def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="arche",
+def plot_violins(framework, domains, df, df_null, df_obs, palette, metric="arche",
 				 dx=[], dy=0.06, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001],
 				 ylim=[-0.1, 0.85], yticks=[0, 0.25, 0.5, 0.75], print_fig=True, 
 				 font=utilities.arial, path=""):
@@ -17,7 +17,7 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="arch
 	import matplotlib.pyplot as plt
 	from matplotlib import cm, font_manager, rcParams
 
-	font_prop = font_manager.FontProperties(fname=font, size=24)
+	font_prop = font_manager.FontProperties(fname=font, size=20)
 	rcParams["axes.linewidth"] = 1.5
 
 	# Set up figure
@@ -26,7 +26,7 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="arch
 
 	# Violin plot of observed values
 	for i, dom in enumerate(domains):
-		data = sorted(df_boot.loc[dom].dropna())
+		data = sorted(df_obs.loc[dom].dropna())
 		obs = df.loc[dom, "OBSERVED"]
 		v = ax.violinplot(data, positions=[i], 
 						  showmeans=False, showmedians=False, widths=0.85)
@@ -52,7 +52,7 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="arch
 	upper = [sorted(df_null.loc[dom])[int(n_iter*interval)] for dom in domains]
 	plt.fill_between(range(len(domains)), lower, upper, 
 					 alpha=0.2, color="gray")
-	plt.plot(df_null.mean(axis=1), linestyle="dashed", color="gray", linewidth=2)
+	plt.plot(df_null.values.mean(axis=1), linestyle="dashed", color="gray", linewidth=2)
 
 	# Set plot parameters
 	plt.xticks(range(len(domains)), [""]*len(domains))

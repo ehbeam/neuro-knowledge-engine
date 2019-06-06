@@ -8,15 +8,14 @@ import sys
 sys.path.append("..")
 import utilities
 
-def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="mod",
+def plot_violins(framework, domains, df, df_null, df_obs, palette, metric="mod",
 				 dx=[], dy=0.5, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001],
 				 ylim=[0.5,8.5], yticks=[2,4,6,8], font=utilities.arial, print_fig=True, path=""):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import cm, font_manager, rcParams
 
-	font = font_manager.FontProperties(fname=font, size=20)
-	font_lg = font_manager.FontProperties(fname=font, size=24)
+	font_prop = font_manager.FontProperties(fname=font, size=20)
 	rcParams["axes.linewidth"] = 1.5
 
 	# Set up figure
@@ -25,7 +24,7 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="mod"
 
 	# Violin plot of observed values
 	for i, dom in enumerate(domains):
-		data = sorted(df_boot.loc[dom].dropna())
+		data = sorted(df_obs.loc[dom].dropna())
 		obs = df.loc[dom, "OBSERVED"]
 		v = ax.violinplot(data, positions=[i], 
 						  showmeans=False, showmedians=False, widths=0.85)
@@ -44,7 +43,7 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="mod"
 		for alpha, y in zip(alphas, dys):
 			if df["FDR"][i] < alpha:
 				plt.text(i-ds, min(max(data), 9.5) + y, "*", 
-						 fontproperties=font_lg)
+						 fontproperties=font_prop)
 
 	# Confidence interval of null distribution
 	n_iter = df_null.shape[1]
@@ -52,11 +51,11 @@ def plot_violins(framework, domains, df, df_null, df_boot, palette, metric="mod"
 	upper = [sorted(df_null.loc[dom])[int(n_iter*interval)] for dom in domains]
 	plt.fill_between(range(len(domains)), lower, upper, 
 					 alpha=0.18, color="gray")
-	plt.plot(df_null.mean(axis=1), linestyle="dashed", color="gray", linewidth=2)
+	plt.plot(df_null.values.mean(axis=1), linestyle="dashed", color="gray", linewidth=2)
 
 	# Set plot parameters
 	plt.xticks(range(len(domains)), [""]*len(domains))
-	plt.yticks(yticks, fontproperties=font)
+	plt.yticks(yticks, fontproperties=font_prop)
 	plt.xlim([-0.75, len(domains)-0.35])
 	plt.ylim(ylim)
 	for side in ["right", "top"]:
