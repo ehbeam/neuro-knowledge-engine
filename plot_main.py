@@ -786,7 +786,7 @@ for framework in frameworks:
 
 
 ### Article partitions ###
-print("\nPlotting article partitions")
+print("\nPlotting MDS of article partitions")
 
 import matplotlib.pyplot as plt
 
@@ -813,24 +813,9 @@ for framework in frameworks:
 
 X = pd.read_csv(outfile, index_col=0, header=0).values
 
-metric = True
-eps = 0.001
-max_iter = 5000
-
 for framework in frameworks:
-
-	fig, ax = plt.subplots(figsize=(8,8))
-	for i in range(X.shape[0]):
-		plt.scatter(X[i,0], X[i,1], c=colors[framework][i], 
-					marker=markers[framework][i], alpha=0.525, s=13)
-	plt.xticks([])
-	plt.yticks([])
-	for side in ["top", "bottom", "left", "right"]:
-		ax.spines[side].set_visible(False)
-	plt.tight_layout()
-	plt.savefig("mds/figures/{}_mds_metric{}_eps{}_iter{}_vecs.png".format(
-				framework, int(metric), eps, int(max_iter)), dpi=250)
-	plt.close()
+	plot_mds(X, framework, colors, markers, metric=True, eps=0.001, max_iter=5000, 
+			 path="mds/", print_fig=False)
 
 
 
