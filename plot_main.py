@@ -47,6 +47,7 @@ atlas = utilities.load_atlas(path="data")
 # Font for plots
 arial = "style/Arial Unicode.ttf"
 
+
 ################################################
 ##### 1. Generate the data-driven ontology #####
 ################################################
@@ -95,8 +96,8 @@ for k in circuit_counts:
 			lists = lists.append(R)
 		lists.to_csv(outfile, index=None)
 
-# Select optimal number of words per domain
-# Note: Run on Sherlock, generating ontology/lists/*_oplen.csv
+Select optimal number of words per domain
+Note: Run on Sherlock, generating ontology/lists/*_oplen.csv
 
 # Select optimal number of domains
 import torch, math
@@ -223,7 +224,7 @@ dtm_bin_fw = utilities.doc_mean_thres(dtm_bin_fw)
 
 
 ###### RDoC ######
-print("\n--- Generating the RDoC framework ---")
+print("\n--- Generating the rdoc framework ---")
 
 vsm = pd.read_csv("data/text/glove_gen_n100_win15_min5_iter500_{}.txt".format(vsm_version), 
 					index_col=0, header=None, sep=" ")
@@ -285,7 +286,7 @@ utilities.map_plane(dom_links_thres, atlas, "ontology/figures/circuits/rdoc", su
 
 
 ###### DSM ######
-print("\n--- Generating the DSM framework ---")
+print("\n--- Generating the dsm framework ---")
 
 vsm = pd.read_csv("data/text/glove_psy_n100_win15_min5_iter500_{}.txt".format(vsm_version), 
 				  index_col=0, header=None, sep=" ")
@@ -359,9 +360,24 @@ metric_labels = ["rocauc", "f1"] # Evaluation metrics to be computed in the test
 alpha = 0.001 # Significance level for plotting statistical comparisons
 interval = 0.999 # Confidence interval for plotting null distributions
 
+# Brain structure labels
+struct_labels = pd.read_csv("data/brain/labels.csv", index_col=None)
+struct_labels.index = struct_labels["PREPROCESSED"]
+struct_labels = struct_labels.loc[act_bin.columns, "ABBREVIATION"].values
+
+# Parameters for plotting evaluation metrics
+axis_labels = {"forward": struct_labels, "reverse": []}
+figsize = {"forward": (13, 3.2), "reverse": (3.6, 3.2)}
+ylim = {"rocauc": [0.4, 0.8], "f1": [0.3, 0.7]}
+dxs = {"forward": {"data-driven": 0.55, "rdoc": 0.55, "dsm": 0.55}, 
+	   "reverse": {"data-driven": 0.11, "rdoc": 0.11, "dsm": 0.17}}
+opacity = {"forward": 0.4, "reverse": 0.65}
+
 obs, boot, null = {}, {}, {} # Dictionaries for framework-level results
 
 for framework in frameworks:
+
+	print("\n-- Processing {} framework --".format(framework))
 
 	lists, circuits = utilities.load_framework(framework, suffix=suffix[framework], path="ontology")
 	scores = utilities.score_lists(lists, dtm_bin)
@@ -395,11 +411,11 @@ for framework in frameworks:
 
 		fpr, tpr = evaluation.compute_roc(labels, pred_probs)
 		evaluation.plot_curves("roc", framework, direction, fpr, tpr, palette[direction], 
-					opacity=0.4, font=arial, path="prediction/", print_fig=False)
+							   opacity=opacity[direction], font=arial, path="prediction/", print_fig=False)
 
 		precision, recall = evaluation.compute_prc(labels, pred_probs)
 		evaluation.plot_curves("prc", framework, direction, recall, precision, palette[direction], 
-					opacity=0.4, diag=False, font=arial, path="prediction/", print_fig=False)
+							   opacity=opacity[direction], diag=False, font=arial, path="prediction/", print_fig=False)
 
 	X = {"forward": scores_tensor, "reverse": act_bin_tensor}
 	Y = {"forward": act_bin_tensor, "reverse": scores_tensor}
@@ -432,11 +448,12 @@ for framework in frameworks:
 			boot[framework][direction]["f1"] = pd.read_csv(f1_file, index_col=0, header=0).values
 		else:
 			for n in range(n_iter):
-				samp = np.random.choice(range(m), size=m, replace=True)
+				samp = np.random.choice(range(len(test)), size=len(test), replace=True)
 				boot[framework][direction]["f1"][:,n] = evaluation.compute_eval_metric(Y[direction][samp,:], preds[direction][samp,:], f1_score)
 
 	null[framework] = {"name": framework_names[framework]} 
 	for direction in directions:
+		print("\n   {}".format(direction.upper()))
 		null[framework][direction] = {}
 		null[framework][direction]["rocauc"] = np.empty((len(obs[framework][direction]["rocauc"]), n_iter))
 		null[framework][direction]["f1"] = np.empty((len(obs[framework][direction]["f1"]), n_iter))
@@ -449,14 +466,14 @@ for framework in frameworks:
 				shuf = np.random.choice(range(len(test)), size=len(test), replace=False)
 				null[framework][direction]["rocauc"][:,n] = evaluation.compute_eval_metric(Y[direction][shuf,:], pred_probs[direction], roc_auc_score)
 				if n % (n_iter/10) == 0:
-					print("\tIteration {}".format(n))
+					print("\tProcessed {} iterations".format(n))
 		
 		f1_file = "prediction/data/f1_null_{}_{}_{}iter.csv".format(framework, direction, n_iter)
 		if os.path.isfile(f1_file):
 			null[framework][direction]["f1"] = pd.read_csv(f1_file, index_col=0, header=0).values
 		else:
 			for n in range(n_iter):
-				samp = np.random.choice(range(m), size=m, replace=True)
+				samp = np.random.choice(range(len(test)), size=len(test), replace=True)
 				null[framework][direction]["f1"][:,n] = evaluation.compute_eval_metric(Y[direction][shuf,:], preds[direction], f1_score)
 
 	idx_lower = int((1.0-interval)*n_iter)
@@ -483,17 +500,6 @@ for framework in frameworks:
 		for direction in directions:
 			fdr[direction][metric] = multipletests(p[direction][metric], method="fdr_bh")[1]
 
-	struct_labels = pd.read_csv("data/brain/labels.csv", index_col=None)
-	struct_labels.index = struct_labels["PREPROCESSED"]
-	struct_labels = struct_labels.loc[act_bin.columns, "ABBREVIATION"].values
-
-	for direction, labels, figsize in zip(directions, [struct_labels, []], [(13, 3.2), (3.6, 3.2)]):
-		for metric in metric_labels:
-			evaluation.plot_eval_metric(metric, framework, direction, obs[framework][direction][metric], 
-							 boot[framework][direction][metric], null_ci[direction][metric], fdr[direction][metric],
-							 palette[direction], labels=labels, dx=0.375, dxs=0.55, print_fig=False,
-							 figsize=figsize, ylim=[0.4, 0.8], alpha=alpha, font=arial, path="prediction/")
-
 	labels = {"forward": act_bin.columns, "reverse": domains}
 	for metric in metric_labels:
 		for direction in directions:
@@ -504,6 +510,13 @@ for framework in frameworks:
 						  metric, dist, framework, direction, n_iter))
 			obs_df = pd.Series(obs[framework][direction][metric], index=labels[direction])
 			obs_df.to_csv("prediction/data/{}_obs_{}_{}.csv".format(metric, framework, direction))
+
+	for direction in directions:
+		for metric in metric_labels:
+			evaluation.plot_eval_metric(metric, framework, direction, obs[framework][direction][metric], 
+							 boot[framework][direction][metric], null_ci[direction][metric], fdr[direction][metric],
+							 palette[direction], labels=axis_labels[direction], dx=0.375, dxs=dxs[direction][framework], print_fig=False,
+							 figsize=figsize[direction], ylim=ylim[metric], alpha=alpha, font=arial, path="prediction/")
 
 # Compare the frameworks
 fdr, sig = {}, {}
@@ -572,10 +585,10 @@ from scipy.spatial.distance import dice, cdist
 # Nudges for plotted means
 mod_dx = {"data-driven": [0.36, 0.35, 0.38, 0.38, 0.34, 0.35],
 	  	  "rdoc": [0.31, 0.38, 0.37, 0.40, 0.36, 0.38],
-	  	  "dsm": [0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36]}
+	  	  "dsm": [0.38, 0.38, 0.35, 0.38, 0.37, 0.38, 0.37, 0.36, 0.32]}
 gen_dx = {"data-driven": [0.39, 0.38, 0.37, 0.39, 0.39, 0.38],
-	  	  "rdoc": [0.31, 0.38, 0.37, 0.40, 0.36, 0.38],
-	  	  "dsm": [0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36]}
+	  	  "rdoc": [0.31, 0.4, 0.36, 0.39, 0.39, 0.37],
+	  	  "dsm": [0.36, 0.37, 0.39, 0.39, 0.39, 0.39, 0.32, 0.34, 0.39]}
 
 # Nudges for plotted stars
 mod_ds = {"data-driven": 0.09, "rdoc": 0.09, "dsm": 0.13}
