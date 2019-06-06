@@ -5,7 +5,8 @@ sys.path.append("..")
 import utilities
 
 
-def plot_mds(X, framework, colors, markers, metric, eps, max_iter, path=""):
+def plot_mds(X, framework, colors, markers, metric=True, eps=0.001, max_iter=5000, 
+			 path="", print_fig=True):
 
 	import matplotlib.pyplot as plt
 
@@ -20,6 +21,8 @@ def plot_mds(X, framework, colors, markers, metric, eps, max_iter, path=""):
 	plt.tight_layout()
 	plt.savefig("{}figures/{}_mds_metric{}_eps{}_iter{}_vecs.png".format(
 				path, framework, int(metric), eps, int(max_iter)), dpi=250)
+	if print_fig:
+		plt.show()
 	plt.close()
 
 
