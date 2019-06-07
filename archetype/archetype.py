@@ -78,7 +78,7 @@ def plot_framework_comparison(boot, obs, n_iter=1000, dx=0.38, ylim=[0.4,0.65], 
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager, rcParams
 
-	font_prop = font_manager.FontProperties(fname=font, size=24)
+	font_prop = font_manager.FontProperties(fname=font, size=20)
 	rcParams["axes.linewidth"] = 1.5
 
 	# Set up figure
