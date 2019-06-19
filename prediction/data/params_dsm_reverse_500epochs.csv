@@ -1,4 +1,4 @@
-weight_decay,1e-05
-p_dropout,0.1
-n_hid,25
-lr,0.0001
+weight_decay,0.01
+p_dropout,0.7
+n_hid,150
+lr,0.001

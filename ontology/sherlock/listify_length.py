@@ -137,7 +137,7 @@ def optimize_hyperparameters(param_list, train_set, val_set, n_epochs=100):
     
     # Evaluate on the validation set
     with torch.no_grad():
-      preds_val = net(inputs_val).float()
+      preds_val = net.eval()(inputs_val).float()
     score_val = roc_auc_score(labels_val, preds_val, average="macro")
     print("\n   Validation Set ROC-AUC {:6.4f}\n".format(score_val))
     

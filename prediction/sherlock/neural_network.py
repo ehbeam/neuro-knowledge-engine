@@ -162,7 +162,7 @@ def optimize_hyperparameters(param_list, train_set, val_set, n_epochs=100):
 		n_input = train_set[0][0].shape[0]
 		n_output = train_set[0][1].shape[0]
 		net = Net(n_input=n_input, n_output=n_output, 
-			n_hid=params["n_hid"], p_dropout=params["p_dropout"])
+				  n_hid=params["n_hid"], p_dropout=params["p_dropout"])
 		optimizer = optim.Adam(net.parameters(),
 							   lr=params["lr"], weight_decay=params["weight_decay"])
 		net.apply(reset_weights)
@@ -191,7 +191,7 @@ def optimize_hyperparameters(param_list, train_set, val_set, n_epochs=100):
 		
 		# Evaluate on the validation set
 		with torch.no_grad():
-			preds_val = net(inputs_val).float()
+			preds_val = net.eval()(inputs_val).float()
 		score_val = roc_auc_score(labels_val, preds_val, average="macro")
 		print("\n   Validation Set ROC-AUC {:6.4f}\n".format(score_val))
 		

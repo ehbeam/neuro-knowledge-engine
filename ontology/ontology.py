@@ -173,9 +173,9 @@ def compute_eval_scores(scoring_function, directions, circuit_counts, features, 
 			data_set = load_mini_batches(features[k]["function"].loc[ids], features[k]["structure"].loc[ids], 
 										ids, mini_batch_size=len(ids), seed=42)
 			function_features, structure_features = numpy2torch(data_set[0])
-			y_pred_for = fits["forward"][k](function_features).float()
+			y_pred_for = fits["forward"][k].eval()(function_features).float()
 			y_true_for = structure_features
-			y_pred_rev = fits["reverse"][k](structure_features).float()
+			y_pred_rev = fits["reverse"][k].eval()(structure_features).float()
 			y_true_rev = function_features
 
 		score_for = scoring_function(y_true_for, y_pred_for, average="macro")
@@ -197,7 +197,7 @@ def load_eval_data(features, k, ids):
 
 def load_eval_preds(clf, features):
 	with torch.no_grad():
-		preds = clf(features).float()
+		preds = clf.eval()(features).float()
 	return preds
 
 
