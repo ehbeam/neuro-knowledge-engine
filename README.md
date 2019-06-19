@@ -32,5 +32,6 @@ Codebase for a manuscript in preparation by Elizabeth Beam, Christopher Potts, R
 | 7g, 8h-j, 9g-i             | prediction/comp_frameworks.ipynb                                                                          |
 | 10a-f, 11a-f, 12a-f, 13a-f | prediction/pred\_\*\_logreg.ipynb, prediction/logistic_regression/prediction.py, prediction/evaluation.py |
 | 10g, 11g, 12g-i, 13g-i     | prediction/comp_frameworks_logreg.ipynb                                                                   |
-| 14a-c                      | partition/part\_\*.ipynb, partition/partition.py                                                          |
-| 14d-f                      | tsne/tsne.ipynb                                                                                           |
+| 14-16     				 | prediction/pred\_\*\_logreg.ipynb, prediction/logistic_regression/prediction.py, prediction/evaluation.py, prediction/table_lr-nn.ipynb |
+| 17a-c                      | partition/part\_\*.ipynb, partition/partition.py                                                          |
+| 17d-f                      | tsne/tsne.ipynb                                                                                           |
