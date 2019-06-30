@@ -122,8 +122,8 @@ def train_classifier(framework, direction, suffix="", dtm_version=190325):
 		pickle.dump(op_fit, open(fit_file, "wb"), protocol=2)
 		
 
-train_classifier("data-driven", "forward", suffix="", dtm_version=190325)
-train_classifier("data-driven", "reverse", suffix="", dtm_version=190325)
+train_classifier("data-driven", "forward", suffix="_lr", dtm_version=190325)
+train_classifier("data-driven", "reverse", suffix="_lr", dtm_version=190325)
 train_classifier("rdoc", "forward", suffix="_opsim", dtm_version=190325)
 train_classifier("rdoc", "reverse", suffix="_opsim", dtm_version=190325)
 train_classifier("dsm", "forward", suffix="_opsim", dtm_version=190325)

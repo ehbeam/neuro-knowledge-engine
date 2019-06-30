@@ -6,21 +6,24 @@ import utilities
 
 
 def plot_mds(X, framework, colors, markers, metric=True, eps=0.001, max_iter=5000, 
-			 path="", print_fig=True):
+			 path="", suffix="", print_fig=True):
 
 	import matplotlib.pyplot as plt
 
 	fig, ax = plt.subplots(figsize=(8,8))
+
+	key = framework + suffix
+
 	for i in range(X.shape[0]):
-		plt.scatter(X[i,0], X[i,1], c=colors[framework][i], 
-					marker=markers[framework][i], alpha=0.525, s=13)
+		plt.scatter(X[i,0], X[i,1], c=colors[key][i], 
+					marker=markers[key][i], alpha=0.525, s=13)
 	plt.xticks([])
 	plt.yticks([])
 	for side in ["top", "bottom", "left", "right"]:
 		ax.spines[side].set_visible(False)
 	plt.tight_layout()
 	plt.savefig("{}figures/{}_mds_metric{}_eps{}_iter{}_vecs.png".format(
-				path, framework, int(metric), eps, int(max_iter)), dpi=250)
+				path, key, int(metric), eps, int(max_iter)), dpi=250)
 	if print_fig:
 		plt.show()
 	plt.close()

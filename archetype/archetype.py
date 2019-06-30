@@ -12,7 +12,7 @@ import utilities
 def plot_violins(framework, domains, df, df_null, df_obs, palette, metric="arche",
 				 dx=[], dy=0.06, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001],
 				 ylim=[-0.1, 0.85], yticks=[0, 0.25, 0.5, 0.75], print_fig=True, 
-				 font=utilities.arial, path=""):
+				 font=utilities.arial, path="", suffix=""):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import cm, font_manager, rcParams
@@ -65,15 +65,15 @@ def plot_violins(framework, domains, df, df_null, df_obs, palette, metric="arche
 	ax.yaxis.set_tick_params(width=1.5, length=7)
 
 	# Export figure
-	plt.savefig("{}figures/{}_{}_{}iter.png".format(
-				path, metric, framework, n_iter), dpi=250, bbox_inches="tight")
+	plt.savefig("{}figures/{}_{}{}_{}iter.png".format(
+				path, metric, framework, suffix, n_iter), dpi=250, bbox_inches="tight")
 	if print_fig:
 		plt.show()
 	plt.close()
 
 
 def plot_framework_comparison(boot, obs, n_iter=1000, dx=0.38, ylim=[0.4,0.65], yticks=[], 
-							  print_fig=True, font=utilities.arial, path=""):
+							  print_fig=True, font=utilities.arial, path="", suffix=""):
 	
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager, rcParams
@@ -114,7 +114,7 @@ def plot_framework_comparison(boot, obs, n_iter=1000, dx=0.38, ylim=[0.4,0.65], 
 		ax.spines[side].set_visible(False)
 	ax.xaxis.set_tick_params(width=1.5, length=7)
 	ax.yaxis.set_tick_params(width=1.5, length=7)
-	plt.savefig("{}figures/arche_{}iter.png".format(path, n_iter), 
+	plt.savefig("{}figures/arche_{}_{}iter.png".format(path, suffix, n_iter), 
 				dpi=250, bbox_inches="tight")
 	if print_fig:
 		plt.show()

@@ -48,10 +48,10 @@ def load_doc_term_matrix(version=190124, binarize=True, path="../data"):
 	return dtm
 
 
-def load_framework(framework, suffix="", path="../ontology"):
-	list_file = "{}/lists/lists_{}{}.csv".format(path, framework, suffix)
+def load_framework(framework, suffix="", circuit_suffix="", path="../ontology"):
+	list_file = "{}/lists/lists_{}{}{}.csv".format(path, framework, suffix, circuit_suffix)
 	lists = pd.read_csv(list_file, index_col=None)
-	circuit_file = "{}/circuits/circuits_{}.csv".format(path, framework)
+	circuit_file = "{}/circuits/circuits_{}{}.csv".format(path, framework, circuit_suffix)
 	circuits = pd.read_csv(circuit_file, index_col=0)
 	return lists, circuits
 

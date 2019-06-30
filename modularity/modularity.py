@@ -9,8 +9,8 @@ sys.path.append("..")
 import utilities
 
 def plot_violins(framework, domains, df, df_null, df_obs, palette, metric="mod",
-				 dx=[], dy=0.5, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001],
-				 ylim=[0.5,8.5], yticks=[2,4,6,8], font=utilities.arial, print_fig=True, path=""):
+				 dx=[], dy=0.5, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001], ylim=[0.5,8.5], 
+				 yticks=[2,4,6,8], font=utilities.arial, print_fig=True, path="", suffix=""):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import cm, font_manager, rcParams
@@ -64,15 +64,15 @@ def plot_violins(framework, domains, df, df_null, df_obs, palette, metric="mod",
 	ax.yaxis.set_tick_params(width=1.5, length=7)
 
 	# Export figure
-	plt.savefig("{}figures/{}_{}_{}iter.png".format(
-				path, metric, framework, n_iter), dpi=250, bbox_inches="tight")
+	plt.savefig("{}figures/{}_{}{}_{}iter.png".format(
+				path, metric, framework, suffix, n_iter), dpi=250, bbox_inches="tight")
 	if print_fig:
 		plt.show()
 	plt.close()
 
 
 def plot_framework_comparison(boot, obs, n_iter=1000, print_fig=True,
-							  dx=0.38, ylim=[0.4,0.65], yticks=[], font=utilities.arial):
+							  dx=0.38, ylim=[0.4,0.65], yticks=[], font=utilities.arial, suffix=""):
 	
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager, rcParams
@@ -112,7 +112,7 @@ def plot_framework_comparison(boot, obs, n_iter=1000, print_fig=True,
 		ax.spines[side].set_visible(False)
 	ax.xaxis.set_tick_params(width=1.5, length=7)
 	ax.yaxis.set_tick_params(width=1.5, length=7)
-	plt.savefig("figures/mod_{}iter.png".format(n_iter), 
+	plt.savefig("figures/mod_{}_{}iter.png".format(suffix, n_iter), 
 				dpi=250, bbox_inches="tight")
 	if print_fig:
 		plt.show()

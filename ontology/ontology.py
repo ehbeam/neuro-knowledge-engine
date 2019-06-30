@@ -23,8 +23,8 @@ rcParams["axes.linewidth"] = 1.5
 from scipy.spatial.distance import cdist
 
 
-def load_ontology(k, path=""):
-	list_file = "{}lists/lists_k{:02d}_oplen.csv".format(path, k)
+def load_ontology(k, path="", suffix=""):
+	list_file = "{}lists/lists_k{:02d}_oplen{}.csv".format(path, k, suffix)
 	lists = pd.read_csv(list_file, index_col=None)
 	circuit_file = "{}circuits/circuits_k{:02d}.csv".format(path, k)
 	circuits = pd.read_csv(circuit_file, index_col=None)
@@ -87,39 +87,47 @@ def compute_cooccurrences_null(activations, scores, n_iter=1000, verbose=False):
 
 
 class Net(nn.Module):
-	def __init__(self, n_input=0, n_output=0, n_hid=100, p_dropout=0.5):
-		super(Net, self).__init__()
-		self.fc1 = nn.Linear(n_input, n_hid)
-		self.fc2 = nn.Linear(n_hid, n_hid)
-		self.fc3 = nn.Linear(n_hid, n_hid)
-		self.fc4 = nn.Linear(n_hid, n_hid)
-		self.fc5 = nn.Linear(n_hid, n_hid)
-		self.dropout1 = nn.Dropout(p=p_dropout),
-		self.fc6 = nn.Linear(n_hid, n_hid)
-		self.dropout2 = nn.Dropout(p=p_dropout),
-		self.fc7 = nn.Linear(n_hid, n_hid)
-		self.dropout3 = nn.Dropout(p=p_dropout),
-		self.fc8 = nn.Linear(n_hid, n_output)
+  def __init__(self, n_input=0, n_output=0, n_hid=100, p_dropout=0.5):
+    super(Net, self).__init__()
+    self.fc1 = nn.Linear(n_input, n_hid)
+    self.bn1 = nn.BatchNorm1d(n_hid)
+    self.dropout1 = nn.Dropout(p=p_dropout)
+    self.fc2 = nn.Linear(n_hid, n_hid)
+    self.bn2 = nn.BatchNorm1d(n_hid)
+    self.dropout2 = nn.Dropout(p=p_dropout)
+    self.fc3 = nn.Linear(n_hid, n_hid)
+    self.bn3 = nn.BatchNorm1d(n_hid)
+    self.dropout3 = nn.Dropout(p=p_dropout)
+    self.fc4 = nn.Linear(n_hid, n_hid)
+    self.bn4 = nn.BatchNorm1d(n_hid)
+    self.dropout4 = nn.Dropout(p=p_dropout)
+    self.fc5 = nn.Linear(n_hid, n_hid)
+    self.bn5 = nn.BatchNorm1d(n_hid)
+    self.dropout5 = nn.Dropout(p=p_dropout)
+    self.fc6 = nn.Linear(n_hid, n_hid)
+    self.bn6 = nn.BatchNorm1d(n_hid)
+    self.dropout6 = nn.Dropout(p=p_dropout)
+    self.fc7 = nn.Linear(n_hid, n_hid)
+    self.bn7 = nn.BatchNorm1d(n_hid)
+    self.dropout7 = nn.Dropout(p=p_dropout)
+    self.fc8 = nn.Linear(n_hid, n_output)
+    
+    # Xavier initialization for weights
+    for fc in [self.fc1, self.fc2, self.fc3, self.fc4,
+           self.fc5, self.fc6, self.fc7, self.fc8]:
+      nn.init.xavier_uniform_(fc.weight)
 
-		# Xavier initialization for weights
-		for fc in [self.fc1, self.fc2, self.fc3, self.fc4,
-				   self.fc5, self.fc6, self.fc7, self.fc8]:
-			nn.init.xavier_uniform_(fc.weight)
-
-	def forward(self, x):
-		x = F.relu(self.fc1(x))
-		x = F.relu(self.fc2(x))
-		x = F.relu(self.fc3(x))
-		x = F.relu(self.fc4(x))
-		x = F.relu(self.fc5(x))
-		x = F.dropout(x)
-		x = F.relu(self.fc6(x))
-		x = F.dropout(x)
-		x = F.relu(self.fc7(x))
-		x = F.dropout(x)
-		x = torch.sigmoid(self.fc8(x))
-		return x
-
+  def forward(self, x):
+    x = self.dropout1(F.relu(self.bn1(self.fc1(x))))
+    x = self.dropout2(F.relu(self.bn2(self.fc2(x))))
+    x = self.dropout3(F.relu(self.bn3(self.fc3(x))))
+    x = self.dropout4(F.relu(self.bn4(self.fc4(x))))
+    x = self.dropout5(F.relu(self.bn5(self.fc5(x))))
+    x = self.dropout6(F.relu(self.bn6(self.fc6(x))))
+    x = self.dropout7(F.relu(self.bn7(self.fc7(x))))
+    x = torch.sigmoid(self.fc8(x))
+    return x
+ 
 
 def numpy2torch(data):
 	inputs, labels = data
