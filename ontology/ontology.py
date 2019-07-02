@@ -60,6 +60,32 @@ def load_stm(act_bin, dtm_bin):
 	return stm
 
 
+def cluster_structures(k, stm, structures):
+	kmeans = KMeans(n_clusters=k, max_iter=1000, random_state=42)
+	kmeans.fit(stm)
+	clust = pd.DataFrame({"STRUCTURE": structures, 
+						  "CLUSTER": [l+1 for l in list(kmeans.labels_)]})
+	clust = clust.sort_values(["CLUSTER", "STRUCTURE"])
+	return clust
+
+
+def assign_functions(clust, splits, act_bin, dtm_bin, list_lens=range(5,26)):
+
+	from scipy.stats import pointbiserialr
+
+	lists = pd.DataFrame()
+	for i in range(k):
+		structures = list(clust.loc[clust["CLUSTER"] == i+1, "STRUCTURE"])
+		centroid = np.mean(act_bin.loc[splits["train"], structures], axis=1)
+		R = pd.Series([pointbiserialr(dtm_bin.loc[splits["train"], word], centroid)[0] 
+					   for word in lexicon], index=lexicon)
+		R = R[R > 0].sort_values(ascending=False)[:max(list_lens)]
+		R = pd.DataFrame({"CLUSTER": [i+1 for l in range(max(list_lens))], 
+						  "TOKEN": R.index, "R": R.values})
+		lists = lists.append(R)
+	return lists
+
+
 def compute_cooccurrences(activations, scores):
 	X = np.matmul(activations.values.T, scores.values)
 	X = pmi(X, positive=True)

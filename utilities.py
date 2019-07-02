@@ -16,6 +16,11 @@ palettes = {"data-driven": [c["blue"], c["magenta"], c["yellow"], c["green"], c[
 			"rdoc": [c["blue"], c["red"], c["green"], c["purple"], c["yellow"], c["orange"]],
 			"dsm": [c["purple"], c["chartreuse"], c["orange"], c["blue"], c["red"], c["magenta"], c["yellow"], c["green"], c["brown"]]}
 
+colormaps = {"data-driven": ["Blues", cmaps["Magentas"], cmaps["Yellows"], "Greens", "Reds", cmaps["Purples"]],
+			 "rdoc": ["Blues", "Reds", "Greens", cmaps["Purples"], cmaps["Yellows"], "Oranges"],
+			 "dsm": [cmaps["Purples"], cmaps["Chartreuses"], "Oranges", "Blues", "Reds", 
+			 cmaps["Magentas"], cmaps["Yellows"], "Greens", cmaps["Browns"]]}
+
 arial = "../style/Arial Unicode.ttf"
 
 
@@ -33,11 +38,13 @@ def load_coordinates(path="../data"):
 	return activations
 
 
-def load_lexicon(sources, path="../lexicon"):
+def load_lexicon(sources, path="../lexicon", tkn_filter=None):
 	lexicon = []
 	for source in sources:
 		file = "{}/lexicon_{}.txt".format(path, source)
 		lexicon += [token.strip() for token in open(file, "r").readlines()]
+	if tkn_filter:
+		lexicon = sorted(list(set(lexicon).intersection(tkn_filter)))
 	return sorted(lexicon)
 
 
@@ -48,10 +55,10 @@ def load_doc_term_matrix(version=190124, binarize=True, path="../data"):
 	return dtm
 
 
-def load_framework(framework, suffix="", circuit_suffix="", path="../ontology"):
-	list_file = "{}/lists/lists_{}{}{}.csv".format(path, framework, suffix, circuit_suffix)
+def load_framework(framework, list_suffix="", clf_suffix="", path="../ontology"):
+	list_file = "{}/lists/lists_{}{}{}.csv".format(path, framework, list_suffix, clf_suffix)
 	lists = pd.read_csv(list_file, index_col=None)
-	circuit_file = "{}/circuits/circuits_{}{}.csv".format(path, framework, circuit_suffix)
+	circuit_file = "{}/circuits/circuits_{}{}.csv".format(path, framework, clf_suffix)
 	circuits = pd.read_csv(circuit_file, index_col=0)
 	return lists, circuits
 

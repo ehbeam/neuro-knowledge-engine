@@ -1,14 +1,11 @@
 #!/usr/bin/python3
 
-import os
-import pandas as pd
-import numpy as np
-np.random.seed(42)
+import argparse
 
-import utilities
-
-from collections import OrderedDict
-from statsmodels.stats.multitest import multipletests
+parser = argparse.ArgumentParser(description="Generate plots for 'A computational knowledge engine for human neuroscience'")
+parser.add_argument("clf", type=str, default="lr", options=["lr", "nn"], 
+					help="Classification architecture ('lr' for logistic regression, 'nn' for neural network)")
+args = parser.parse_args()
 
 
 ################################################
@@ -17,35 +14,30 @@ from statsmodels.stats.multitest import multipletests
 
 print("\n--- Loading the data ---")
 
+import utilities
+
 vsm_version = 190428 # Version of GloVe embeddings
 dtm_version = 190325 # Version of document-term matrix
 rdoc_version = 190124 # Version of RDoC matrix
 
-n_iter = 1000 # Iterations for bootstrap and null distributions
-
 frameworks = ["data-driven", "rdoc", "dsm"] # Frameworks to analyze
-framework_names = {"data-driven": "Data-Driven", "rdoc": "RDoC", "dsm": "DSM"}
-suffix = {"data-driven": "", "rdoc": "_opsim", "dsm": "_opsim"} # For framework infiles 
+titles = {"data-driven": "Data-Driven", "rdoc": "RDoC", "dsm": "DSM"}
+suffixes = {"data-driven": "_lr", "rdoc": "_opsim", "dsm": "_opsim"} # For framework infiles 
 
-# Binarized data
-act_bin = utilities.load_coordinates(path="data") # Activation coordinates
-dtm_bin = utilities.load_doc_term_matrix(version=dtm_version, binarize=True, path="data") # Document-term matrix
+# Text and activation coordinate inputs
+dtm = utilities.load_doc_term_matrix(version=dtm_version, binarize=True, path="data") # Document-term matrix
+act = utilities.load_coordinates(path="data") # Activation coordinates
+
+# Atlas for brain circuit plots
+atlas = utilities.load_atlas(path="data")
 
 # PMIDs and their splits
-pmids = act_bin.index.intersection(dtm_bin.index)
-train, val, test = [[int(pmid.strip()) 
-			   		for pmid in open("data/splits/{}.txt".format(split))] 
-						for split in ["train", "validation", "test"]]
+pmids = act.index.intersection(dtm.index)
+splits = {split: [int(pmid.strip()) for pmid in open("data/splits/{}.txt".format(split))] 
+				  for split in ["train", "validation", "test"]}
 
-# Colormaps for brain plots
-from utilities import cmaps, palettes
-cmaps_dd = ["Blues", cmaps["Magentas"], cmaps["Yellows"], "Greens", "Reds", cmaps["Purples"]]
-cmaps_rdoc = ["Blues", "Reds", "Greens", cmaps["Purples"], cmaps["Yellows"], "Oranges"]
-cmaps_dsm = [cmaps["Purples"], cmaps["Chartreuses"], "Oranges", "Blues", "Reds", 
-			 cmaps["Magentas"], cmaps["Yellows"], "Greens", cmaps["Browns"]]
-
-# Atlas for brain plots
-atlas = utilities.load_atlas(path="data")
+# Iterations for bootstrap and null distributions
+n_iter = 1000
 
 # Font for plots
 arial = "style/Arial Unicode.ttf"
@@ -57,58 +49,42 @@ arial = "style/Arial Unicode.ttf"
 
 print("\n--- Generating the data-driven ontology ---")
 
-## Load the lexicon
-lexicon = utilities.load_lexicon(["cogneuro"], path="lexicon")
-lexicon = sorted(list(set(lexicon).intersection(dtm_bin.columns)))
-dtm_bin_cog = dtm_bin[lexicon]
-
-# Cluster structures by functions
+import os
+import pickle
+import pandas as pd
 from ontology import ontology
 from sklearn.cluster import KMeans
-from scipy.stats import pointbiserialr
+from sklearn.preprocessing import binarize
 
-stm = ontology.load_stm(act_bin.loc[train], dtm_bin_cog.loc[train]) # PMI-weighted structure-term matrix
+# Load the lexicon
+lexicon = utilities.load_lexicon(["cogneuro"], path="lexicon", tkn_filter=dtm.columns)
+
+# Compute the PMI-weighted structure-term matrix
+stm = ontology.load_stm(act.loc[splits["train"]], dtm.loc[splits["train"], lexicon]) 
+
+# Specify the output ranges for number of circuits and terms per circuit
 circuit_counts = range(2, 26) # Range over which ROC-AUC becomes asymptotic
 list_lens = range(5, 26) # Same range as RDoC and the DSM
 
+# Generate the data-driven domains over the specified ranges
 for k in circuit_counts:
+
+	# Cluster structures by functions
 	circuit_file = "ontology/circuits/circuits_k{:02d}.csv".format(k)
 	if not os.path.isfile(circuit_file):
-		kmeans = KMeans(n_clusters=k, max_iter=1000, random_state=42)
-		kmeans.fit(stm)
-		clust = pd.DataFrame({"STRUCTURE": act_bin.columns, 
-							  "CLUSTER": [l+1 for l in list(kmeans.labels_)]})
-		clust = clust.sort_values(["CLUSTER", "STRUCTURE"])
+		clust = ontology.cluster_structures(k, stm, act.columns)
 		clust.to_csv(circuit_file, index=None)
 
-# Associate functions to circuits
-for k in circuit_counts:
-	circuit_file = "ontology/circuits/circuits_k{:02d}.csv".format(k)
-	clust = pd.read_csv(circuit_file, index_col=None)
-	outfile = "ontology/lists/lists_k{:02d}.csv".format(k)
-	if not os.path.isfile(outfile):
-		lists = pd.DataFrame()
-		for i in range(k):
-			structures = list(clust.loc[clust["CLUSTER"] == i+1, "STRUCTURE"])
-			centroid = np.mean(act_bin.loc[train, structures], axis=1)
-			R = pd.Series([pointbiserialr(dtm_bin_cog.loc[train, word], centroid)[0] 
-						   for word in dtm_bin_cog.columns], index=dtm_bin_cog.columns)
-			R = R[R > 0].sort_values(ascending=False)[:max(list_lens)]
-			R = pd.DataFrame({"CLUSTER": [i+1 for l in range(max(list_lens))], 
-							  "TOKEN": R.index, "R": R.values})
-			lists = lists.append(R)
-		lists.to_csv(outfile, index=None)
+	# Associate functions to circuits
+	list_file = "ontology/lists/lists_k{:02d}.csv".format(k)
+	if not os.path.isfile(list_file):
+		lists = ontology.assign_functions(clust, splits, act, dtm, list_lens=list_lens)
+		lists.to_csv(list_file, index=None)
 
 # Select optimal number of words per domain
 # Note: Run on Sherlock, generating ontology/lists/*_oplen.csv
 
 # Select optimal number of domains
-import torch, math
-from sklearn.preprocessing import binarize
-from sklearn.metrics import roc_auc_score
-from ontology.ontology import compute_eval_scores, compute_eval_boot, compute_eval_null
-from ontology.ontology import Net, plot_scores, load_ontology
-from utilities import doc_mean_thres
 
 directions = ["forward", "reverse"]
 
@@ -131,17 +107,17 @@ features = {k: {} for k in circuit_counts}
 for k in circuit_counts:
 	domains = range(1, k+1)
 	lists, circuits = ontology.load_ontology(k, path="ontology/")
-	function_features = pd.DataFrame(index=dtm_bin_cog.index, columns=domains)
-	structure_features = pd.DataFrame(index=act_bin.index, columns=domains)
+	function_features = pd.DataFrame(index=dtm.index, columns=domains)
+	structure_features = pd.DataFrame(index=act.index, columns=domains)
 	for i in domains:
 		functions = lists.loc[lists["CLUSTER"] == i, "TOKEN"]
-		function_features[i] = dtm_bin_cog[functions].sum(axis=1)
+		function_features[i] = dtm[functions].sum(axis=1)
 		structures = circuits.loc[circuits["CLUSTER"] == i, "STRUCTURE"]
-		structure_features[i] = act_bin[structures].sum(axis=1)
-	function_features = pd.DataFrame(doc_mean_thres(function_features), 
-									 index=dtm_bin_cog.index, columns=domains)
+		structure_features[i] = act[structures].sum(axis=1)
+	function_features = pd.DataFrame(utilities.doc_mean_thres(function_features), 
+									 index=dtm.index, columns=domains)
 	structure_features = pd.DataFrame(binarize(structure_features), 
-									 index=act_bin.index, columns=domains)
+									 index=act.index, columns=domains)
 	features[k]["function"] = function_features
 	features[k]["structure"] = structure_features
 
@@ -161,11 +137,9 @@ for direction, shape in zip(directions + ["mean"], [">", "<", "D"]):
 lists, circuits = ontology.load_ontology(op_k, path="ontology/")
 
 # Name the domains
-from ontology.ontology import term_degree_centrality
-
 k2name = {}
 for k in range(op_k):
-	degrees = ontology.term_degree_centrality(k+1, lists, circuits, dtm_bin, train)
+	degrees = ontology.term_degree_centrality(k+1, lists, circuits, dtm, splits["train"])
 	name = degrees.index[0].upper()
 	k2name[k+1] = name
 
@@ -183,7 +157,7 @@ lists.to_csv("ontology/lists/lists_data-driven.csv", index=None)
 
 # Plot the term lists
 print("\nPlotting word clouds")
-ontology.plot_wordclouds("data-driven", names, lists, dtm_bin_cog, width=600,
+ontology.plot_wordclouds("data-driven", names, lists, dtm[lexicon], width=600,
 						 path="ontology/", font_path=arial, print_fig=False)
 
 # Export the named circuits
@@ -195,20 +169,24 @@ circuits.to_csv("ontology/circuits/clusters_data-driven.csv", index=None)
 
 # Plot the named circuits
 print("\nPlotting circuit maps")
-circuit_mat = pd.DataFrame(0.0, index=act_bin.columns, columns=names)
+circuit_mat = pd.DataFrame(0.0, index=act.columns, columns=names)
 for name in names:
 	structures = circuits.loc[circuits["DOMAIN"] == name, "STRUCTURE"]
 	for structure in structures:
 		circuit_mat.loc[structure, name] = 1.0
 circuit_mat.to_csv("ontology/circuits/circuits_data-driven.csv")
 utilities.map_plane(circuit_mat, atlas, "ontology/figures/circuits/data-driven", 
-		  			suffix="_z", plane="z", cmaps=cmaps_dd, cbar=True, vmin=0.0, vmax=2.0,
+		  			suffix="_z", plane="z", cmaps=utilities.colormaps["data-driven"], cbar=True, vmin=0.0, vmax=2.0,
 		  			verbose=False, print_fig=False, annotate=True)
 
 
 ################################################
 ###### 2. Generate the expert frameworks #######
 ################################################
+
+import collections
+import numpy as np
+np.random.seed(42)
 
 n_iter_fw = 10000 # Iterations for seed similarity and PPMI circuits
 
@@ -218,9 +196,9 @@ list_len = list(list_lens)[-1]
 alphas = [0.01, 0.001] # Statistical significance level for seed similarity
 interval = 0.95 # Confidence interval for seed similarity null distribution
 
-dtm_bin_fw = utilities.load_doc_term_matrix(version=dtm_version, binarize=False, path="data")
-dtm_bin_fw = dtm_bin_fw.loc[:, (dtm_bin_fw != 0).any(axis=0)]
-dtm_bin_fw = utilities.doc_mean_thres(dtm_bin_fw)
+dtm_fw = utilities.load_doc_term_matrix(version=dtm_version, binarize=False, path="data")
+dtm_fw = dtm_fw.loc[:, (dtm_fw != 0).any(axis=0)]
+dtm_fw = utilities.doc_mean_thres(dtm_fw)
 
 
 ###### RDoC ######
@@ -232,12 +210,12 @@ vsm = pd.read_csv("data/text/glove_gen_n100_win15_min5_iter500_{}.txt".format(vs
 seed_df = pd.read_csv("lexicon/rdoc_{}/rdoc_seeds.csv".format(rdoc_version), 
 					  index_col=None, header=0)
 seed_df = seed_df.loc[seed_df["TOKEN"].isin(vsm.index)]
-doms = list(OrderedDict.fromkeys(seed_df["DOMAIN"]))
+doms = list(collections.OrderedDict.fromkeys(seed_df["DOMAIN"]))
 
-lexicon = sorted(list(set(lexicon).union(seed_df["TOKEN"]).intersection(dtm_bin_fw.columns).intersection(vsm.index)))
+lexicon = sorted(list(set(lexicon).union(seed_df["TOKEN"]).intersection(dtm_fw.columns).intersection(vsm.index)))
 
 lists = ontology.load_rdoc_lists(lexicon, vsm, seed_df, n_thres=list_len)
-lists = lists.loc[lists["TOKEN"].isin(dtm_bin_fw.columns)]
+lists = lists.loc[lists["TOKEN"].isin(dtm_fw.columns)]
 lists.to_csv("ontology/lists/lists_rdoc.csv", index=None)
 
 op_df = ontology.load_optimized_lists(doms, lists, list_lens, seed_df, vsm)
@@ -274,14 +252,14 @@ ontology.plot_rdoc_similarity(doms, new_sim_null, lower, upper, mccoy_sim_boot, 
 
 # Plot the term lists
 print("\nPlotting word clouds")
-ontology.plot_wordclouds("rdoc", doms, new, dtm_bin, 
+ontology.plot_wordclouds("rdoc", doms, new, dtm, 
 						 path="ontology/", font_path=arial, print_fig=False)
 
 # Map the brain circuits
 print("\nPlotting circuit maps")
-dom_links_thres = ontology.load_framework_circuit(new, dtm_bin, act_bin, "rdoc")
+dom_links_thres = ontology.load_framework_circuit(new, dtm, act, "rdoc")
 utilities.map_plane(dom_links_thres, atlas, "ontology/figures/circuits/rdoc", suffix="_z", 
-	  				cmaps=cmaps_rdoc, plane="z", cbar=True, vmin=0.0, vmax=0.6,
+	  				cmaps=utilities.colormaps["rdoc"], plane="z", cbar=True, vmin=0.0, vmax=0.6,
 	  				verbose=False, print_fig=False, annotate=True)
 
 
@@ -292,10 +270,10 @@ vsm = pd.read_csv("data/text/glove_psy_n100_win15_min5_iter500_{}.txt".format(vs
 				  index_col=0, header=None, sep=" ")
 
 seed_df = pd.read_csv("data/text/seeds_dsm5.csv", index_col=None, header=0)
-doms = list(OrderedDict.fromkeys(seed_df["DOMAIN"]))
+doms = list(collections.OrderedDict.fromkeys(seed_df["DOMAIN"]))
 
 lexicon = utilities.load_lexicon(["cogneuro", "dsm", "psychiatry"], path="lexicon")
-lexicon = sorted(list(set(lexicon).intersection(vsm.index).intersection(dtm_bin_fw.columns)))
+lexicon = sorted(list(set(lexicon).intersection(vsm.index).intersection(dtm_fw.columns)))
 
 class_tkns = []
 for dom in doms:
@@ -309,11 +287,11 @@ op_df = ontology.load_optimized_lists(doms, lists, list_lens, seed_df, vsm)
 new = ontology.update_lists(doms, op_df, lists, "dsm")
 
 # Threshold domains by those with one or more terms in >5% of articles with coordinate data
-doms = list(OrderedDict.fromkeys(seed_df["DOMAIN"]))
+doms = list(collections.OrderedDict.fromkeys(seed_df["DOMAIN"]))
 filt_doms = []
 for dom in doms: 
 	tkns = set(new.loc[new["DOMAIN"] == dom, "TOKEN"])
-	freq = sum([1.0 for doc in dtm_bin_fw[tkns].sum(axis=1) if doc > 0]) / float(len(dtm_bin_fw))
+	freq = sum([1.0 for doc in dtm_fw[tkns].sum(axis=1) if doc > 0]) / float(len(dtm_fw))
 	if freq > 0.05:
 		filt_doms.append(dom)
 doms = filt_doms
@@ -325,14 +303,14 @@ new.to_csv("ontology/lists/lists_dsm_opsim.csv", index=None)
 
 # Plot the term lists
 print("\nPlotting word clouds")
-ontology.plot_wordclouds("dsm", doms, new, dtm_bin,
+ontology.plot_wordclouds("dsm", doms, new, dtm,
 						 path="ontology/", font_path=arial, print_fig=False)
 
 # Map the brain circuits
 print("\nPlotting circuit maps")
-dom_links_thres = ontology.load_framework_circuit(new, dtm_bin, act_bin, "dsm")
+dom_links_thres = ontology.load_framework_circuit(new, dtm, act, "dsm")
 utilities.map_plane(dom_links_thres, atlas, "ontology/figures/circuits/dsm", suffix="_z", 
-	  				cmaps=cmaps_dsm, plane="z", cbar=True, vmin=0.0, vmax=0.6,
+	  				cmaps=utilities.colormaps["dsm"], plane="z", cbar=True, vmin=0.0, vmax=0.6,
 	  				verbose=False, print_fig=False, annotate=True)
 
 
@@ -363,7 +341,7 @@ interval = 0.999 # Confidence interval for plotting null distributions
 # Brain structure labels
 struct_labels = pd.read_csv("data/brain/labels.csv", index_col=None)
 struct_labels.index = struct_labels["PREPROCESSED"]
-struct_labels = struct_labels.loc[act_bin.columns, "ABBREVIATION"].values
+struct_labels = struct_labels.loc[act.columns, "ABBREVIATION"].values
 
 # Parameters for plotting evaluation metrics
 axis_labels = {"forward": struct_labels, "reverse": []}
@@ -379,8 +357,8 @@ for framework in frameworks:
 
 	print("\n-- Processing {} framework --".format(framework))
 
-	lists, circuits = utilities.load_framework(framework, suffix=suffix[framework], path="ontology")
-	scores = utilities.score_lists(lists, dtm_bin)
+	lists, circuits = utilities.load_framework(framework, suffix=suffixes[framework], path="ontology")
+	scores = utilities.score_lists(lists, dtm)
 	domains = list(circuits.columns)
 
 	fit = {}
@@ -395,17 +373,17 @@ for framework in frameworks:
 							 n_hid=int(h["n_hid"]), p_dropout=h["p_dropout"])
 		fit[direction].load_state_dict(state_dict)
 
-	test_set = evaluation.load_mini_batches(scores, act_bin, test, mini_batch_size=len(test), seed=42)[0]
+	test_set = evaluation.load_mini_batches(scores, act, splits["test"], mini_batch_size=len(splits["test"]), seed=42)[0]
 	test_set = evaluation.numpy2torch(test_set)
-	scores_tensor, act_bin_tensor = test_set
+	scores_tensor, act_tensor = test_set
 
-	palette = {"forward": [], "reverse": palettes[framework]}
-	for structure in act_bin.columns:
+	palette = {"forward": [], "reverse": utilities.palettes[framework]}
+	for structure in act.columns:
 		dom_idx = np.argmax(circuits.loc[structure].values)
 		color = palette["reverse"][dom_idx]
 		palette["forward"].append(color)
 
-	for direction, features, labels in zip(directions, [scores_tensor, act_bin_tensor], [act_bin_tensor, scores_tensor]):
+	for direction, features, labels in zip(directions, [scores_tensor, act_tensor], [act_tensor, scores_tensor]):
 		with torch.no_grad():
 			pred_probs = fit[direction](features).numpy()
 
@@ -417,19 +395,19 @@ for framework in frameworks:
 		evaluation.plot_curves("prc", framework, direction, recall, precision, palette[direction], 
 							   opacity=opacity[direction], diag=False, font=arial, path="prediction/", print_fig=False)
 
-	X = {"forward": scores_tensor, "reverse": act_bin_tensor}
-	Y = {"forward": act_bin_tensor, "reverse": scores_tensor}
+	X = {"forward": scores_tensor, "reverse": act_tensor}
+	Y = {"forward": act_tensor, "reverse": scores_tensor}
 	with torch.no_grad():
 		pred_probs = {direction: fit[direction](X[direction]).numpy() for direction in directions}
 	preds = {direction: 1 * (pred_probs[direction] > 0.5) for direction in directions}
 
-	obs[framework] = {"name": framework_names[framework]}
+	obs[framework] = {"name": titles[framework]}
 	for direction in directions:
 		obs[framework][direction] = {}
 		obs[framework][direction]["rocauc"] = evaluation.compute_eval_metric(Y[direction], pred_probs[direction], roc_auc_score)
 		obs[framework][direction]["f1"] = evaluation.compute_eval_metric(Y[direction], preds[direction], f1_score)
 
-	boot[framework] = {"name": framework_names[framework]} 
+	boot[framework] = {"name": titles[framework]} 
 	for direction in directions:
 		boot[framework][direction] = {}
 		boot[framework][direction]["rocauc"] = np.empty((len(obs[framework][direction]["rocauc"]), n_iter))
@@ -440,7 +418,7 @@ for framework in frameworks:
 			boot[framework][direction]["rocauc"] = pd.read_csv(rocauc_file, index_col=0, header=0).values
 		else:
 			for n in range(n_iter):
-				samp = np.random.choice(range(len(test)), size=len(test), replace=True)
+				samp = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=True)
 				boot[framework][direction]["rocauc"][:,n] = evaluation.compute_eval_metric(Y[direction][samp,:], pred_probs[direction][samp,:], roc_auc_score)
 		
 		f1_file = "prediction/data/f1_boot_{}_{}_{}iter.csv".format(framework, direction, n_iter)
@@ -448,10 +426,10 @@ for framework in frameworks:
 			boot[framework][direction]["f1"] = pd.read_csv(f1_file, index_col=0, header=0).values
 		else:
 			for n in range(n_iter):
-				samp = np.random.choice(range(len(test)), size=len(test), replace=True)
+				samp = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=True)
 				boot[framework][direction]["f1"][:,n] = evaluation.compute_eval_metric(Y[direction][samp,:], preds[direction][samp,:], f1_score)
 
-	null[framework] = {"name": framework_names[framework]} 
+	null[framework] = {"name": titles[framework]} 
 	for direction in directions:
 		print("\n   {}".format(direction.upper()))
 		null[framework][direction] = {}
@@ -463,7 +441,7 @@ for framework in frameworks:
 			null[framework][direction]["rocauc"] = pd.read_csv(rocauc_file, index_col=0, header=0).values
 		else:
 			for n in range(n_iter):
-				shuf = np.random.choice(range(len(test)), size=len(test), replace=False)
+				shuf = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=False)
 				null[framework][direction]["rocauc"][:,n] = evaluation.compute_eval_metric(Y[direction][shuf,:], pred_probs[direction], roc_auc_score)
 				if n % (n_iter/10) == 0:
 					print("\tProcessed {} iterations".format(n))
@@ -473,7 +451,7 @@ for framework in frameworks:
 			null[framework][direction]["f1"] = pd.read_csv(f1_file, index_col=0, header=0).values
 		else:
 			for n in range(n_iter):
-				samp = np.random.choice(range(len(test)), size=len(test), replace=True)
+				samp = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=True)
 				null[framework][direction]["f1"][:,n] = evaluation.compute_eval_metric(Y[direction][shuf,:], preds[direction], f1_score)
 
 	idx_lower = int((1.0-interval)*n_iter)
@@ -500,7 +478,7 @@ for framework in frameworks:
 		for direction in directions:
 			fdr[direction][metric] = multipletests(p[direction][metric], method="fdr_bh")[1]
 
-	labels = {"forward": act_bin.columns, "reverse": domains}
+	labels = {"forward": act.columns, "reverse": domains}
 	for metric in metric_labels:
 		for direction in directions:
 			for dist, dic in zip(["boot", "null"], [boot, null]):
@@ -602,10 +580,10 @@ for framework in frameworks:
 	print("\n-- Processing {} framework --".format(framework))
 
 	# Load framework data
-	lists, circuits = utilities.load_framework(framework, suffix=suffix[framework], path="ontology")
+	lists, circuits = utilities.load_framework(framework, suffix=suffixes[framework], path="ontology")
 	words = sorted(list(set(lists["TOKEN"])))
-	structures = sorted(list(set(act_bin.columns)))
-	domains = list(OrderedDict.fromkeys(lists["DOMAIN"]))
+	structures = sorted(list(set(act.columns)))
+	domains = list(collections.OrderedDict.fromkeys(lists["DOMAIN"]))
 
 	# Compute "archetypes" of included words and structures
 	archetypes = pd.DataFrame(0.0, index=words+structures, columns=domains)
@@ -615,8 +593,8 @@ for framework in frameworks:
 		for struct in structures:
 			archetypes.loc[struct, dom] = circuits.loc[struct, dom]
 	archetypes[archetypes > 0.0] = 1.0
-	dtm_words = dtm_bin.loc[pmids, words]
-	act_structs = act_bin.loc[pmids, structures]
+	dtm_words = dtm.loc[pmids, words]
+	act_structs = act.loc[pmids, structures]
 	docs = dtm_words.copy()
 	docs[structures] = act_structs.copy()
 
@@ -738,7 +716,7 @@ for framework in frameworks:
 
 	stats = utilities.compare_to_null(df_null, df, domains, n_iter, alpha=alpha)
 
-	modularity.plot_violins(framework, domains, stats, df_null, df_obs, palettes[framework], 
+	modularity.plot_violins(framework, domains, stats, df_null, df_obs, utilities.palettes[framework], 
 				 			dx=mod_dx[framework], ds=mod_ds[framework], alphas=[0], interval=0.999, print_fig=False,
 				 			ylim=[0.75,1.75], yticks=[0.75,1,1.25,1.5,1.75], font=arial, path="modularity/")
 
@@ -796,7 +774,7 @@ for framework in frameworks:
 
 	stats = utilities.compare_to_null(df_null, df, domains, n_iter, alpha=alpha)
 
-	archetype.plot_violins(framework, domains, stats, df_null, df_obs, palettes[framework], 
+	archetype.plot_violins(framework, domains, stats, df_null, df_obs, utilities.palettes[framework], 
 			 	 		   dx=gen_dx[framework], ds=gen_ds[framework], alphas=[0], interval=0.999, print_fig=False,
 			 	 		   ylim=[-0.25,0.75], yticks=[-0.25,0,0.25,0.5,0.75], font=arial, path="archetype/")
 
@@ -812,7 +790,7 @@ partitions = {framework: pd.read_csv("partition/data/doc2dom_{}.csv".format(
 
 colors = {}
 for framework in frameworks:
-	colors[framework] = [palettes[framework][int(partitions[framework].loc[pmid])] for pmid in pmids]
+	colors[framework] = [utilities.palettes[framework][int(partitions[framework].loc[pmid])] for pmid in pmids]
 
 shapes = {"data-driven": ["o", "v", "^", ">", "<", "s"],
 		  "rdoc": ["o", "v", "^", ">", "<", "s"],
