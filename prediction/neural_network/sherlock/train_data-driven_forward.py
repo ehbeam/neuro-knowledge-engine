@@ -1,4 +1,7 @@
 #!/bin/python
 
-import neural_network
-neural_network.train_classifier('data-driven', 'forward', suffix='', use_hyperparams=True)
+import sys
+sys.path.append('..')
+import prediction
+
+prediction.train_classifier('data-driven', 'forward', suffix='', clf='_nn', use_hyperparams=True)

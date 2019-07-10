@@ -115,15 +115,10 @@ for k in args.n_circuits:
 		lists.to_csv(list_file, index=None)
 
 # Evaluate the classifiers used to select the optimal number of domains
-stats = {}
 fits = ontology.load_fits(args.clf, directions, args.n_circuits, path=ontol_path)
 features = ontology.load_domain_features(dtm, act, directions, args.n_circuits, suffix="_"+args.clf, path=ontol_path)
-stats["scores"] = ontology.compute_eval_scores(args.clf, sklearn.metrics.roc_auc_score, directions, 
-											   args.n_circuits, features, fits, splits["validation"])
-stats["boot"] = ontology.compute_eval_boot(args.clf, sklearn.metrics.roc_auc_score, directions, args.n_circuits, features, 
-										   fits, splits["validation"], n_iter=args.n_iter, path=ontol_path)
-stats["null"] = ontology.compute_eval_null(args.clf, sklearn.metrics.roc_auc_score, directions, args.n_circuits, features, 
-										   fits, splits["validation"], n_iter=args.n_iter, path=ontol_path)
+stats = ontology.compute_eval_stats(args.clf, directions, args.n_circuits, features, fits, splits["validation"], 
+									n_iter=args.n_iter, path=ontol_path)
 
 # Plot evaluation metrics
 for direction, shape in zip(directions+["mean"], [">", "<", "D"]):
@@ -422,11 +417,11 @@ for framework in frameworks:
 
 	# Compute statistics for domain modularity
 	if compute_mod:
-		mod_stats = modularity.compute_mod_stats(mod_stats, framework, lists, dom2docs, clf=clfs[framework], 
-												 n_iter=args.n_iter, alpha=args.alpha, path=mod_path)
+		mod_stats = modularity.compute_mod_stats(mod_stats, framework, lists, dom2docs, 
+												 clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=mod_path)
 	else:
-		mod_stats = utilities.load_partition_stats(mod_stats, "mod", framework, lists, dom2docs, clf=clfs[framework], 
-												   n_iter=args.n_iter, alpha=args.alpha, path=mod_path)
+		mod_stats = utilities.load_partition_stats(mod_stats, "mod", framework, lists, dom2docs, 
+												   clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=mod_path)
 
 	# Plot observed values and null distributions by domain
 	utilities.plot_violins(framework, domains, mod_stats["obs"][framework], mod_stats["null"][framework], 
@@ -443,11 +438,11 @@ for framework in frameworks:
 
 	# Compute statistics for domain similarity to archetypes
 	if compute_gen:
-		gen_stats = archetype.compute_gen_stats(gen_stats, framework, lists, dom2docs, sorted_pmids, clf=clfs[framework], 
-												n_iter=args.n_iter, alpha=args.alpha, path=gen_path)
+		gen_stats = archetype.compute_gen_stats(gen_stats, framework, lists, dom2docs, archetypes, 
+												clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=gen_path)
 	else:
-		gen_stats = utilities.load_partition_stats(gen_stats, "arche", framework, lists, dom2docs, clf=clfs[framework], 
-												   n_iter=args.n_iter, alpha=args.alpha, path=gen_path)
+		gen_stats = utilities.load_partition_stats(gen_stats, "arche", framework, lists, dom2docs, 
+												   clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=gen_path)
 
 	# Plot observed values and null distributions by domain
 	utilities.plot_violins(framework, domains, gen_stats["obs"][framework], gen_stats["null"][framework], 

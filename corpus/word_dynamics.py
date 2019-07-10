@@ -1,14 +1,19 @@
 #!/usr/bin/python3
 
+# Plots the proportion of articles that use a given set of terms over time
+
+
 import os, re
 import pandas as pd
 import numpy as np
 
 
 def flip_dic(dic):
+
 	flipped = {val: [] for val in set(dic.values())}
 	for key, val in dic.items():
 		flipped[val].append(key)
+	
 	return flipped
 
 
@@ -37,10 +42,12 @@ def load_data_from_records(dir):
 	print("{} articles missing year info".format(len(missing)))
 	
 	year2pmids = flip_dic(pmid2year)
+	
 	return year2pmids
 
 
 def load_data_from_meta(file):
+
 	df = pd.read_csv(file, index_col=None, encoding="Latin-1")
 	df = df.dropna(subset=["PMID"])
 	df["PMID"] = df["PMID"].astype(int)
@@ -48,6 +55,7 @@ def load_data_from_meta(file):
 
 	pmid2year = {pmid: row["YEAR"] for pmid, row in df.iterrows()}
 	year2pmids = flip_dic(pmid2year)
+
 	return year2pmids
 
 
@@ -70,6 +78,7 @@ def extract_freq_by_year(words, year2pmids, dirs):
 						if word.replace(" ", "_") in text:
 							freq[word][year] += 1.0 / len(year2pmids[year])
 					continue
+
 	return freq
 
 
@@ -85,6 +94,7 @@ def boot_freq_by_year(words, year2pmids, dirs,
 		year2pmids_sample = {year: np.random.choice(list(pmids), 
 							 size=len(pmids), replace=True) for year, pmids in year2pmids.items()}
 		freq_boot[i] = extract_freq_by_year(words, year2pmids_sample, dirs)
+	
 	return freq_boot
 
 
@@ -148,6 +158,7 @@ def plot_freq_over_years(freq, file, freq_boot=[], plot_boot=False):
 			  handletextpad=0.5, borderpad=0.55, bbox_to_anchor=(0, 1.075))
 
 	plt.savefig("figures/{}.png".format(file), dpi=250, bbox_inches="tight")
+
 
 # Words to plot
 words = ["dsm", "rdoc", "machine learning"]

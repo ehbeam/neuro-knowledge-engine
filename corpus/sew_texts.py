@@ -1,6 +1,7 @@
-# Created by Elizabeth Beam on 7/14/17
+#!/usr/bin/python3
+
 # Concatenates text files into one output file
-# Example function call: sew("/Users/ehbeam/Dropbox/Stanford/Research/Projects/Psychiatlas/program", "/texts/preproc", "/data/fulltext_preproc.txt")
+
 
 import os, re
 

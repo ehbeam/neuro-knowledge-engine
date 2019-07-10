@@ -1,12 +1,11 @@
 #!/usr/bin/python
 
-# Preprocess raw full texts in the following steps:
-#   (1) Case-folding and punctuation removal
-#   (2) Lemmatization with WordNet
-#   (3) Consolidation of n-grams from RDoC and select mental functioning ontology
+# Consolidates n-grams from RDoC and select mental functioning ontologies
+
 
 import os, re
 import pandas as pd
+
 
 # Date of RDoC data download
 date = 190124
@@ -19,13 +18,17 @@ ngrams_psych = [word.strip().replace("_", " ") for word in open("lexicon/lexicon
 ngrams = list(set(ngrams_rdoc + ngrams_cogneuro + ngrams_dsm + ngrams_psych))
 ngrams.sort(key = lambda x: x.count(" "), reverse = True)
 
+
 # Function to consolidate n-grams from RDoC then select ontologies
 def preprocess(text):
+
 	text = text.replace("_", " ")
 	for ngram in ngrams:
 		text = text.replace(ngram, ngram.replace(" ", "_"))
 	text = re.sub("\. \.+", ".", text)
+
 	return text
+
 
 # Loop over files in corpus directory
 pmids = [file.replace(".txt", "") for file in os.listdir("corpus") if not file.startswith(".")]

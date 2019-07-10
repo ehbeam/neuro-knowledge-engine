@@ -5,6 +5,7 @@
 #	(2) Mental Disorder Ontology, MFO (Internal): https://github.com/jannahastings/mental-functioning-ontology/tree/master/ontology/internal 
 #	(3) MESH (Category F): https://www.ncbi.nlm.nih.gov/mesh
 
+
 import os, binascii, string
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
@@ -18,6 +19,7 @@ stops = stopwords.words("english")
 
 # Load punctuation from string
 punc = string.punctuation
+
 
 # Function for stemming, conversion to lowercase, and removal of punctuation
 def preprocess(token):
@@ -76,10 +78,12 @@ def preprocess(token):
 
 	return preproc
 
+
 # Initialize lexicon sets and lists
 lexicon_set = set()
 lexicon_raw = set()
 mdo, nifstd, mesh, snomed = [], [], [], []
+
 
 # Load tokens from:
 #	- Cognitive Atlas (disorders)
@@ -89,9 +93,11 @@ def load_txt(file, ngram_set):
 		lexicon_raw.add(token)
 		for t in preprocess(token):
 			lexicon_set.add(t)
+
 ca_types = ["disorders"]
 for type in ca_types:
 	load_txt("cognitive-atlas_{}.txt".format(type), lexicon_set)
+
 
 # Load tokens from MFO
 def load_owl(file, ngram_set, owl_list):
@@ -103,11 +109,13 @@ def load_owl(file, ngram_set, owl_list):
 				lexicon_raw.add(token)
 				for t in preprocess(token):
 					lexicon_set.add(t)
+
 load_owl("MD-core.owl", lexicon_set, mdo)
 mdo_file = open("MD-core.txt", "w+")
 for token in mdo:
 	mdo_file.write(token + "\n")
 mdo_file.close()
+
 
 # Load tokens from MeSH
 def load_mesh(file, ngram_set, mesh_list):
@@ -123,11 +131,13 @@ def load_mesh(file, ngram_set, mesh_list):
 				lexicon_raw.add(token)
 				for t in preprocess(token):
 					lexicon_set.add(t)
+
 load_mesh("MeSH_d2018.bin", lexicon_set, mesh)
 mesh_file = open("MeSH_d2018.txt", "w+")
 for token in mesh:
 	mesh_file.write(token + "\n")
 mesh_file.close()
+
 
 # Export raw ontology lexicon
 lexicon_raw = [n + "\n" for n in lexicon_raw]

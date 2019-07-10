@@ -2,7 +2,6 @@
 
 import pandas as pd
 import numpy as np
-np.random.seed(42)
 
 from style import style
 
@@ -12,68 +11,90 @@ suffix = {"data-driven": "", "rdoc": "_opsim", "dsm": "_opsim"}
 
 
 def doc_mean_thres(df):
+
 	doc_mean = df.mean()
 	df_bin = 1.0 * (df.values > doc_mean.values)
 	df_bin = pd.DataFrame(df_bin, columns=df.columns, index=df.index)
+	
 	return df_bin
 
 
 def load_coordinates(path="../data"):
+	
 	atlas_labels = pd.read_csv("{}/brain/labels.csv".format(path))
 	activations = pd.read_csv("{}/brain/coordinates.csv".format(path), index_col=0)
 	activations = activations[atlas_labels["PREPROCESSED"]]
+	
 	return activations
 
 
 def load_lexicon(sources, path="../lexicon", tkn_filter=[]):
+	
 	lexicon = []
 	for source in sources:
 		file = "{}/lexicon_{}.txt".format(path, source)
 		lexicon += [token.strip() for token in open(file, "r").readlines()]
+	
 	if len(tkn_filter) > 0:
 		lexicon = sorted(list(set(lexicon).intersection(tkn_filter)))
+	
 	return sorted(lexicon)
 
 
 def load_doc_term_matrix(version=190124, binarize=True, path="../data"):
+	
 	dtm = pd.read_csv("{}/text/dtm_{}.csv.gz".format(path, version), compression="gzip", index_col=0)
+	
 	if binarize:
 		dtm = doc_mean_thres(dtm)
+	
 	return dtm
 
 
 def load_framework(framework, suffix="", clf="", path="../ontology"):
+	
 	if path.endswith("/"):
 		path = path[:-1]
+	
 	list_file = "{}/lists/lists_{}{}{}.csv".format(path, framework, suffix, clf)
 	lists = pd.read_csv(list_file, index_col=None)
+	
 	circuit_file = "{}/circuits/circuits_{}{}.csv".format(path, framework, clf)
 	circuits = pd.read_csv(circuit_file, index_col=0)
+	
 	return lists, circuits
 
 
 def score_lists(lists, dtm_bin, label_var="DOMAIN"):
+
 	from collections import OrderedDict
+	
 	labels = OrderedDict.fromkeys(lists[label_var])
 	list_counts = pd.DataFrame(index=dtm_bin.index, columns=labels)
+	
 	for label in list_counts.columns:
 		tkns = lists.loc[lists[label_var] == label, "TOKEN"]
 		list_counts[label] = dtm_bin[tkns].sum(axis=1)
 	list_scores = doc_mean_thres(list_counts)
+	
 	return list_scores
 
 
 def transparent_background(file_name):
+	
 	from PIL import Image
+	
 	img = Image.open(file_name)
 	img = img.convert("RGBA")
 	data = img.getdata()
+	
 	newData = []
 	for item in data:
 		if item[0] == 255 and item[1] == 255 and item[2] == 255:
 			newData.append((255, 255, 255, 0))
 		else:
 			newData.append(item)
+	
 	img.putdata(newData)
 	img.save(file_name, "PNG")
 
@@ -138,7 +159,9 @@ def load_atlas(path="../data"):
 
 def map_plane(estimates, atlas, path, suffix="", plane="z", cbar=False, annotate=False,
 			  vmin=None, vmax=None, cmaps=[], print_fig=True, verbose=False):
+	
 	from nilearn import image, plotting
+	
 	for f, feature in enumerate(estimates.columns):
 		stat_map = image.copy_img(atlas).get_data()
 		data = estimates[feature]

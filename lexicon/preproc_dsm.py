@@ -2,6 +2,7 @@
 
 # Preprocesses tokens from the DSM-5 index
 
+
 import os
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
@@ -10,11 +11,13 @@ import sys
 reload(sys)
 sys.setdefaultencoding("utf-8")
 
+
 # Load WordNet lemmatizer from NLTK
 lemmatizer = WordNetLemmatizer()
 
 # Load English stop words from NLTK
 stops = stopwords.words("english")
+
 
 # Function for stemming, conversion to lowercase, and removal of punctuation
 def preprocess(token):
@@ -74,8 +77,10 @@ def preprocess(token):
 
 	return preproc
 
+
 # Initialize lexicon sets and lists
 lexicon_set = set()
+
 
 # Load tokens from the DSM-5 index
 def load_txt(file, ngram_set):
@@ -83,7 +88,9 @@ def load_txt(file, ngram_set):
 		token = line.strip().lower()
 		for t in preprocess(token):
 			lexicon_set.add(t)
+
 load_txt("dsm5_diagnoses.txt".format(type), lexicon_set)
+
 
 # Export preprocessed ontology lexicon
 lexicon = list(lexicon_set)

@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+
 # Function to make custom linear colormaps
 def make_cmap(colors, position=None, bit=False, name="my_colormap"):
 	

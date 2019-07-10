@@ -7,6 +7,7 @@
 #	(4) Mental Functioning Ontology, MFO (Internal): https://github.com/jannahastings/mental-functioning-ontology/tree/master/ontology/internal 
 #	(5) NIFSTD (Functions): https://github.com/SciCrunch/NIF-Ontology
 
+
 import string, os
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
@@ -20,6 +21,7 @@ stops = stopwords.words("english")
 
 # Symbols to replace
 punc = string.punctuation
+
 
 # Function for stemming, conversion to lowercase, and removal of punctuation
 def preprocess(token):
@@ -83,7 +85,9 @@ def preprocess(token):
 		preproc[i] = token
 
 	preproc = [token for token in preproc if token not in [" ", "3x2", "go", "task"]]
+	
 	return preproc
+
 
 # Initialize lexicon sets and lists
 lexicon_set = set()
@@ -100,6 +104,7 @@ def load_txt(file, ngram_set):
 		lexicon_raw.add(token)
 		for t in preprocess(token):
 			lexicon_set.add(t)
+
 ca_types = ["concepts", "behaviors", "personality-traits", "tasks"]
 for type in ca_types:
 	load_txt("cognitive-atlas_{}.txt".format(type), lexicon_set)
@@ -120,6 +125,7 @@ def load_owl(file, ngram_set, owl_list):
 				lexicon_raw.add(token)
 				for t in preprocess(token):
 					lexicon_set.add(t)
+
 load_owl("MF-core.owl", lexicon_set, mfo)
 mfo_file = open("MF-core.txt", "w+")
 for token in mfo:
@@ -135,11 +141,13 @@ def load_nifstd(file, ngram_set):
 			lexicon_raw.add(token)
 			for t in preprocess(token):
 				lexicon_set.add(t)
+
 load_nifstd("NIF-Ontology/ttl/NIF-Function.ttl", lexicon_set)
 nifstd_file = open("NIF-Function.txt", "w+")
 for token in nifstd:
 	nifstd_file.write(token + "\n")
 nifstd_file.close()
+
 
 # Export raw ontology lexicon
 lexicon_raw = [n + "\n" for n in lexicon_raw]

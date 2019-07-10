@@ -3,8 +3,6 @@
 import os, math
 import numpy as np
 import pandas as pd
-from collections import OrderedDict
-np.random.seed(42)
 
 import torch
 import torch.nn as nn
@@ -16,63 +14,34 @@ torch.manual_seed(42)
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import ParameterSampler
 
-
-def doc_mean_thres(df):
-	doc_mean = df.mean()
-	df_bin = 1.0 * (df.values > doc_mean.values)
-	df_bin = pd.DataFrame(df_bin, columns=df.columns, index=df.index)
-	return df_bin
-
-
-def load_coordinates():
-	atlas_labels = pd.read_csv("../../data/brain/labels.csv")
-	activations = pd.read_csv("../../data/brain/coordinates.csv", index_col=0)
-	activations = activations[atlas_labels["PREPROCESSED"]]
-	return activations
-
-
-def load_doc_term_matrix(version=190325, binarize=True):
-	dtm = pd.read_csv("../../data/text/dtm_{}.csv.gz".format(version), compression="gzip", index_col=0)
-	if binarize:
-		dtm = doc_mean_thres(dtm)
-	return dtm
-
-
-def load_framework(framework, suffix=""):
-	list_file = "../../ontology/lists/lists_{}{}.csv".format(framework, suffix)
-	lists = pd.read_csv(list_file, index_col=None)
-	circuit_file = "../../ontology/circuits/circuits_{}.csv".format(framework)
-	circuits = pd.read_csv(circuit_file, index_col=0)
-	return lists, circuits
-
-
-def score_lists(lists, dtm_bin, label_var="DOMAIN"):
-	labels = OrderedDict.fromkeys(lists[label_var])
-	list_counts = pd.DataFrame(index=dtm_bin.index, columns=labels)
-	for label in list_counts.columns:
-		tkns = lists.loc[lists[label_var] == label, "TOKEN"]
-		list_counts[label] = dtm_bin[tkns].sum(axis=1)
-	list_scores = doc_mean_thres(list_counts)
-	return list_scores
+import sys
+sys.path.append("../..")
+import utilities
 
 
 def numpy2torch(data):
+
 	inputs, labels = data
 	inputs = Variable(torch.from_numpy(inputs.T).float())
 	labels = Variable(torch.from_numpy(labels.T).float())
+	
 	return inputs, labels
 
 
-def load_mini_batches(X, Y, split, mini_batch_size=64, seed=0, reshape_labels=False):
-	
-	np.random.seed(seed)			
+def load_mini_batches(X, Y, split, mini_batch_size=64, seed=42, reshape_labels=False):
+
+	# Adapted from https://www.coursera.org/learn/deep-neural-network
+
+	import math
+	np.random.seed(seed)
+
 	m = len(split) # Number of training examples
 	mini_batches = []
 
 	# Split the data
 	X = X.loc[split].T.values
 	Y = Y.loc[split].T.values
-		
+
 	# Shuffle (X, Y)
 	permutation = list(np.random.permutation(m))
 	shuffled_X = X[:, permutation]
@@ -81,29 +50,31 @@ def load_mini_batches(X, Y, split, mini_batch_size=64, seed=0, reshape_labels=Fa
 		shuffled_Y = shuffled_Y.reshape((1,m))
 
 	# Partition (shuffled_X, shuffled_Y), except the end case
-	num_complete_minibatches = math.floor(m / mini_batch_size) # Mumber of mini batches of size mini_batch_size in your partitionning
-	for k in range(0, int(num_complete_minibatches)):
+	num_complete_minibatches = math.floor(m / mini_batch_size) # Number of mini batches of size mini_batch_size
+	for k in range(0, num_complete_minibatches):
 		mini_batch_X = shuffled_X[:, k * mini_batch_size : (k+1) * mini_batch_size]
 		mini_batch_Y = shuffled_Y[:, k * mini_batch_size : (k+1) * mini_batch_size]
 		mini_batch = (mini_batch_X, mini_batch_Y)
 		mini_batches.append(mini_batch)
-	
+
 	# Handle the end case (last mini-batch < mini_batch_size)
 	if m % mini_batch_size != 0:
 		mini_batch_X = shuffled_X[:, -(m % mini_batch_size):]
 		mini_batch_Y = shuffled_Y[:, -(m % mini_batch_size):]
 		mini_batch = (mini_batch_X, mini_batch_Y)
 		mini_batches.append(mini_batch)
-	
+
 	return mini_batches
 
 
 def reset_weights(m):
+
     if isinstance(m, nn.Linear):
         m.reset_parameters()
 
 
 class Net(nn.Module):
+
 	def __init__(self, n_input=0, n_output=0, n_hid=100, p_dropout=0.5):
 		super(Net, self).__init__()
 		self.fc1 = nn.Linear(n_input, n_hid)
@@ -143,6 +114,7 @@ class Net(nn.Module):
 		x = self.dropout6(F.relu(self.bn6(self.fc6(x))))
 		x = self.dropout7(F.relu(self.bn7(self.fc7(x))))
 		x = torch.sigmoid(self.fc8(x))
+
 		return x
 
 
@@ -207,7 +179,7 @@ def optimize_hyperparameters(param_list, train_set, val_set, n_epochs=100):
 	return op_state_dict, op_params, op_loss
 
 
-def train_classifier(framework, direction, suffix="", dtm_version=190325, 
+def train_classifier(framework, direction, suffix="", clf="", dtm_version=190325, 
 					 opt_epochs=500, train_epochs=1000, use_hyperparams=False):
 
 	# Load the data splits
@@ -216,12 +188,12 @@ def train_classifier(framework, direction, suffix="", dtm_version=190325,
 		splits[split] = [int(pmid.strip()) for pmid in open("../../data/splits/{}.txt".format(split), "r").readlines()]
 
 	# Load the activation coordinate and text data
-	act_bin = load_coordinates()
-	dtm_bin = load_doc_term_matrix(version=dtm_version, binarize=True)
+	act_bin = utilities.load_coordinates(path="../../data")
+	dtm_bin = utilities.load_doc_term_matrix(version=dtm_version, binarize=True, path="../../data")
 	
 	# Score the texts using the framework
-	lists, circuits = load_framework(framework, suffix=suffix)
-	scores = score_lists(lists, dtm_bin)
+	lists, circuits = utilities.load_framework(framework, suffix=suffix, clf=clf, path="../../ontology")
+	scores = utilities.score_lists(lists, dtm_bin)
 		
 	# If hyperparameters have already been optimizd, use them
 	param_file = "../data/params_{}_{}_{}epochs.csv".format(framework, direction, opt_epochs)

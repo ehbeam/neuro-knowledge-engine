@@ -1,50 +1,14 @@
 #!/usr/bin/python3
 
 import os
-import collections
 import pandas as pd
 import numpy as np
-np.random.seed(42)
-
-
-def doc_mean_thres(df):
-	doc_mean = df.mean()
-	df_bin = 1.0 * (df.values > doc_mean.values)
-	df_bin = pd.DataFrame(df_bin, columns=df.columns, index=df.index)
-	return df_bin
-
-
-def load_coordinates():
-	atlas_labels = pd.read_csv("../data/brain/labels.csv")
-	activations = pd.read_csv("../data/brain/coordinates.csv", index_col=0)
-	activations = activations[atlas_labels["PREPROCESSED"]]
-	return activations
-
-
-def load_doc_term_matrix(version=190124, binarize=True):
-	dtm = pd.read_csv("../data/text/dtm_{}.csv.gz".format(version), compression="gzip", index_col=0)
-	if binarize:
-		dtm = doc_mean_thres(dtm)
-	return dtm
-
-
-def load_lexicon(sources):
-	lexicon = []
-	for source in sources:
-		file = "../lexicon/lexicon_{}.txt".format(source)
-		lexicon += [token.strip() for token in open(file, "r").readlines()]
-	return sorted(lexicon)
-
-
-def load_framework(framework, suffix=""):
-	list_file = "../ontology/lists/lists_{}{}.csv".format(framework, suffix)
-	lists = pd.read_csv(list_file, index_col=None)
-	circuit_file = "../ontology/circuits/circuits_{}.csv".format(framework)
-	circuits = pd.read_csv(circuit_file, index_col=0)
-	return lists, circuits
 
 
 def load_archetypes(lists, circuits):
+
+	import collections
+
 	domains = list(collections.OrderedDict.fromkeys(lists["DOMAIN"]))
 	words = sorted(list(set(lists["TOKEN"])))
 	structures = sorted(list(set(circuits.index)))
@@ -55,6 +19,7 @@ def load_archetypes(lists, circuits):
 		for struct in structures:
 			archetypes.loc[struct, dom] = circuits.loc[struct, dom]
 	archetypes[archetypes > 0.0] = 1.0
+	
 	return archetypes
 
 
@@ -93,10 +58,11 @@ def compute_distances(docs, metric="dice"):
 
 	dists = cdist(docs, docs, metric=metric)
 	dists = pd.DataFrame(dists, index=docs.index, columns=docs.index)	
+	
 	return dists
 
 
-def plot_partition(framework, doc_dists, transitions, path=""):
+def plot_partition(framework, doc_dists, transitions, path="", print_fig=True):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import cm, font_manager, rcParams
@@ -115,5 +81,7 @@ def plot_partition(framework, doc_dists, transitions, path=""):
 
 	plt.savefig("{}figures/partition_{}.png".format(path, framework), 
 				dpi=250, bbox_inches="tight")
-	plt.show()
+	if print_fig:
+		plt.show()
+	plt.close()
 

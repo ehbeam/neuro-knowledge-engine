@@ -2,9 +2,11 @@
 
 # Compute DTM for the cognitive neuroscience lexicon
 
+
 import os
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
+
 
 # Date RDoC data was downloaded
 date = 190124

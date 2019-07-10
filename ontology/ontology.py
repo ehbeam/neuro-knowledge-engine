@@ -1,73 +1,71 @@
 #!/usr/bin/python3
 
-import os
+import os, sklearn
 import pandas as pd
 import numpy as np
-np.random.seed(42)
-
-import torch, math
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
-torch.manual_seed(42)
 
 import sys
 sys.path.append("..")
 import utilities
 from style import style
-from prediction.neural_network.sherlock.neural_network import Net
-
-from matplotlib import font_manager, rcParams
-font_md = font_manager.FontProperties(fname=style.font, size=20)
-font_lg = font_manager.FontProperties(fname=style.font, size=22)
-rcParams["axes.linewidth"] = 1.5
-
-from scipy.spatial.distance import cdist
+from prediction.neural_network import prediction
 
 
 def load_ontology(k, path="", suffix=""):
+
 	list_file = "{}lists/lists_k{:02d}_oplen{}.csv".format(path, k, suffix)
 	lists = pd.read_csv(list_file, index_col=None)
 	circuit_file = "{}circuits/circuits_k{:02d}.csv".format(path, k)
 	circuits = pd.read_csv(circuit_file, index_col=None)
+
 	return lists, circuits
 
 
 def observed_over_expected(df):
+
 	# From https://github.com/cgpotts/cs224u/blob/master/vsm.py
+
 	col_totals = df.sum(axis=0)
 	total = col_totals.sum()
 	row_totals = df.sum(axis=1)
 	expected = np.outer(row_totals, col_totals) / total
 	oe = df / expected
+
 	return oe
 
 
 def pmi(df, positive=True):
+
 	# From https://github.com/cgpotts/cs224u/blob/master/vsm.py
+
 	df = observed_over_expected(df)
 	with np.errstate(divide="ignore"):
 		df = np.log(df)
 	df[np.isinf(df)] = 0.0  # log(0) = 0
 	if positive:
 		df[df < 0] = 0.0
+
 	return df
 
 
 def load_stm(act_bin, dtm_bin):
+
 	stm = np.dot(act_bin.transpose(), dtm_bin)
 	stm = pd.DataFrame(stm, columns=dtm_bin.columns, index=act_bin.columns)
 	stm = pmi(stm, positive=False)
 	stm = stm.dropna(axis=1, how="all") # Drop terms with no co-occurrences
+
 	return stm
 
 
 def cluster_structures(k, stm, structures):
+
 	kmeans = KMeans(n_clusters=k, max_iter=1000, random_state=42)
 	kmeans.fit(stm)
 	clust = pd.DataFrame({"STRUCTURE": structures, 
 						  "CLUSTER": [l+1 for l in list(kmeans.labels_)]})
 	clust = clust.sort_values(["CLUSTER", "STRUCTURE"])
+
 	return clust
 
 
@@ -85,20 +83,25 @@ def assign_functions(k, clust, splits, act, dtm, lexicon, list_lens=range(5,26))
 		R = pd.DataFrame({"CLUSTER": [i+1 for l in range(max(list_lens))], 
 						  "TOKEN": R.index, "R": R.values})
 		lists = lists.append(R)
+
 	return lists
 
 
 def load_fits(clf, directions, n_circuits, path=""):
 
 	import pickle, torch
+	from prediction.neural_network.prediction import Net
 
 	fits = {}
 	for direction in directions:
 		fits[direction] = {}
+		
 		for k in n_circuits:
+			
 			if clf == "lr":
 				fit_file = "{}logistic_regression/sherlock/fits/{}_k{:02d}_{}.p".format(path, direction, k, direction)
 				fits[direction][k] = pickle.load(open(fit_file, "rb"))
+			
 			if clf == "nn":
 				state_dict = torch.load("{}neural_network/sherlock/fits/{}_k{:02d}.pt".format(path, direction, k))
 				hyperparams = pd.read_csv("{}neural_network/data/params_data-driven_k{:02d}_{}.csv".format(path, k, direction), 
@@ -110,6 +113,7 @@ def load_fits(clf, directions, n_circuits, path=""):
 				fits[direction][k] = Net(n_input=n_input, n_output=n_output, 
 								 		 n_hid=int(h["n_hid"]), p_dropout=h["p_dropout"])
 				fits[direction][k].load_state_dict(state_dict)
+
 	return fits
 
 
@@ -134,20 +138,25 @@ def load_domain_features(dtm, act, directions, n_circuits, suffix="", path=""):
 										 index=act.index, columns=domains)
 		features[k]["function"] = function_features
 		features[k]["structure"] = structure_features
+
 	return features
 
 
 def compute_cooccurrences(activations, scores):
+
 	X = np.matmul(activations.values.T, scores.values)
 	X = pmi(X, positive=True)
 	X = pd.DataFrame(X, columns=scores.columns, index=activations.columns)
 	X = X.dropna(axis=1, how="any")
 	X = X.loc[:, (X != 0).any(axis=0)]
+
 	return X
 
 
 def compute_cooccurrences_null(activations, scores, n_iter=1000, verbose=False):
+
 	np.random.seed(42)
+	
 	X_null = np.empty((activations.shape[1], scores.shape[1], n_iter))
 	act_mat = activations.values.T
 	scores_mat = scores.values
@@ -160,52 +169,13 @@ def compute_cooccurrences_null(activations, scores, n_iter=1000, verbose=False):
 		if verbose:
 			if n % (n_iter/10) == 0:
 				print("Iteration {}".format(n))
+
 	return X_null
  
 
-def numpy2torch(data):
-	inputs, labels = data
-	inputs = Variable(torch.from_numpy(inputs.T).float())
-	labels = Variable(torch.from_numpy(labels.T).float())
-	return inputs, labels
-
-
-def load_mini_batches(X, Y, split, mini_batch_size=64, seed=0, reshape_labels=False):
-
-	np.random.seed(seed)	  
-	m = len(split) # Number of training examples
-	mini_batches = []
-
-	# Split the data
-	X = X.loc[split].T.values
-	Y = Y.loc[split].T.values
-
-	# Shuffle (X, Y)
-	permutation = list(np.random.permutation(m))
-	shuffled_X = X[:, permutation]
-	shuffled_Y = Y[:, permutation]
-	if reshape_labels:
-		shuffled_Y = shuffled_Y.reshape((1,m))
-
-	# Partition (shuffled_X, shuffled_Y), except the end case
-	num_complete_minibatches = math.floor(m / mini_batch_size) # Mumber of mini batches of size mini_batch_size in your partitionning
-	for k in range(0, num_complete_minibatches):
-		mini_batch_X = shuffled_X[:, k * mini_batch_size : (k+1) * mini_batch_size]
-		mini_batch_Y = shuffled_Y[:, k * mini_batch_size : (k+1) * mini_batch_size]
-		mini_batch = (mini_batch_X, mini_batch_Y)
-		mini_batches.append(mini_batch)
-
-	# Handle the end case (last mini-batch < mini_batch_size)
-	if m % mini_batch_size != 0:
-		mini_batch_X = shuffled_X[:, -(m % mini_batch_size):]
-		mini_batch_Y = shuffled_Y[:, -(m % mini_batch_size):]
-		mini_batch = (mini_batch_X, mini_batch_Y)
-		mini_batches.append(mini_batch)
-
-	return mini_batches
-
-
 def compute_eval_scores(clf, scoring_function, directions, n_circuits, features, fits, ids):
+
+	from torch import no_grad
 
 	eval_scores = {direction: np.zeros((len(n_circuits))) for direction in directions}
 	
@@ -218,10 +188,11 @@ def compute_eval_scores(clf, scoring_function, directions, n_circuits, features,
 			y_pred_rev = fits["reverse"][k].predict_proba(structure_features)
 
 		if clf == "nn":
-			with torch.no_grad():
-				data_set = load_mini_batches(features[k]["function"].loc[ids], features[k]["structure"].loc[ids], 
-											 ids, mini_batch_size=len(ids), seed=42)
-				function_features, structure_features = numpy2torch(data_set[0])
+			with no_grad():
+				data_set = prediction.load_mini_batches(features[k]["function"].loc[ids], 
+														features[k]["structure"].loc[ids], 
+											 			ids, mini_batch_size=len(ids), seed=42)
+				function_features, structure_features = prediction.numpy2torch(data_set[0])
 				y_pred_for = fits["forward"][k].eval()(function_features).float()
 				y_pred_rev = fits["reverse"][k].eval()(structure_features).float()
 
@@ -229,116 +200,134 @@ def compute_eval_scores(clf, scoring_function, directions, n_circuits, features,
 		eval_scores["reverse"][i] = scoring_function(function_features, y_pred_rev, average="macro")
 
 	eval_scores["mean"] = np.mean([eval_scores["forward"], eval_scores["reverse"]], axis=0)
+	
 	return eval_scores
 
 
 def load_eval_data(features, k, ids):
-	with torch.no_grad():
-		data_set = load_mini_batches(features[k]["function"].loc[ids], features[k]["structure"].loc[ids], 
-									ids, mini_batch_size=len(ids), seed=42)
-		function_features, structure_features = numpy2torch(data_set[0])
+
+	from torch import no_grad
+	
+	with no_grad():
+		data_set = prediction.load_mini_batches(features[k]["function"].loc[ids], 
+												features[k]["structure"].loc[ids], 
+												ids, mini_batch_size=len(ids), seed=42)
+		function_features, structure_features = prediction.numpy2torch(data_set[0])
+	
 	return function_features, structure_features
 
 
 def load_eval_preds(clf, fit, features):
-	
+
 	if clf == "lr":
 		preds = fit.predict_proba(features)
 
 	if clf == "nn":
-		with torch.no_grad():
+
+		from torch import no_grad
+
+		with no_grad():
 			preds = fit.eval()(features).float()
 
 	return preds
 
 
-def compute_eval_boot(clf, scoring_function, directions, n_circuits, 
-					  features, fits, ids, n_iter=1000, verbose=True, path=""):
-	eval_boot = {direction: np.zeros((len(n_circuits), n_iter)) for direction in directions}
+def compute_eval_boot_direction(stats, direction, n_circuits, clf, features, fits, ids, 
+								func=sklearn.metrics.roc_auc_score, n_iter=1000, verbose=True, path=""):
 
-	file_for = "{}data/circuits_{}_forward_boot_{}iter.csv".format(path, clf, n_iter)
-	if not os.path.exists(file_for):
-		print("Bootstrap for N Domains | Forward")
+	np.random.seed(42)
+
+	file = "{}data/circuits_{}_{}_boot_{}iter.csv".format(path, clf, direction, n_iter)
+	if not os.path.exists(file):
+		print("Bootstrap for N Domains | {}".format(direction.title()))
+		
 		for i, k in enumerate(n_circuits):
 			if i % 10 == 0 and verbose:
 				print("   Processing {}th k".format(i))
 			function_features, structure_features = load_eval_data(features, k, ids)
-			y_pred_for = load_eval_preds(clf, fits["forward"][k], function_features)
-			y_true_for = structure_features
+			if direction == "forward":
+				x, y_true = function_features, structure_features
+			if direction == "reverse":
+				x, y_true = structure_features, function_features
+			y_pred = load_eval_preds(clf, fits[direction][k], x)
+			
 			for n in range(n_iter):
 				boot = np.random.choice(range(len(ids)), size=len(ids), replace=True)
-				score_for = scoring_function(y_true_for[boot,:], y_pred_for[boot,:], average="macro")
-				eval_boot["forward"][i,n] = score_for
-		pd.DataFrame(eval_boot["forward"]).to_csv(file_for)
-	elif os.path.exists(file_for):
-		eval_boot["forward"] = pd.read_csv(file_for, index_col=0, header=0).values
-
-	file_rev = "{}data/circuits_{}_reverse_boot_{}iter.csv".format(path, clf, n_iter)
-	if not os.path.exists(file_rev):
-		print("Bootstrap for N Domains | Reverse")
-		for i, k in enumerate(n_circuits):
-			if i % 10 == 0 and verbose:
-				print("   Processing {}th k".format(i))
-			with torch.no_grad():
-				function_features, structure_features = load_eval_data(features, k, ids)
-				y_pred_rev = load_eval_preds(clf, fits["reverse"][k], structure_features)
-				y_true_rev = function_features
-			for n in range(n_iter):
-				boot = np.random.choice(range(len(ids)), size=len(ids), replace=True)
-				score_rev = scoring_function(y_true_rev[boot,:], y_pred_rev[boot,:], average="macro")
-				eval_boot["reverse"][i,n] = score_rev
-		pd.DataFrame(eval_boot["reverse"]).to_csv(file_rev)
-		print("")
-	elif os.path.exists(file_rev):
-		eval_boot["reverse"] = pd.read_csv(file_rev, index_col=0, header=0).values
-
-	eval_boot["mean"] = np.mean([eval_boot["forward"], eval_boot["reverse"]], axis=0)
-	return eval_boot
-
-
-def compute_eval_null(clf, scoring_function, directions, n_circuits,
-					  features, fits, ids, n_iter=1000, verbose=True, path=""):
-	eval_null = {direction: np.zeros((len(n_circuits), n_iter)) for direction in directions}
+				stats[direction][i,n] = func(y_true[boot,:], y_pred[boot,:], average="macro")
+		
+		pd.DataFrame(stats[direction]).to_csv(file)
 	
-	file_for = "{}data/circuits_{}_forward_null_{}iter.csv".format(path, clf, n_iter)
-	if not os.path.exists(file_for):
-		print("Permutation for N Domains | Forward")
+	elif os.path.exists(file):
+		stats[direction] = pd.read_csv(file, index_col=0, header=0).values
+
+	return stats
+
+
+def compute_eval_boot(clf, scoring_function, directions, n_circuits, features, fits, ids, 
+					  func=sklearn.metrics.roc_auc_score, n_iter=1000, verbose=True, path=""):
+
+	stats = {direction: np.zeros((len(n_circuits), n_iter)) for direction in directions}
+	for direction in directions:
+		stats = compute_eval_boot_direction(stats, direction, n_circuits, clf, features, fits, ids,
+											func=func, n_iter=n_iter, verbose=verbose, path=path)
+	stats["mean"] = np.mean([stats["forward"], stats["reverse"]], axis=0)
+
+	return stats
+
+
+def compute_eval_null_direction(stats, direction, n_circuits, clf, features, fits, ids,
+								func=sklearn.metrics.roc_auc_score, n_iter=1000, verbose=True, path=""):
+
+	np.random.seed(42)
+
+	file = "{}data/circuits_{}_{}_null_{}iter.csv".format(path, clf, direction, n_iter)
+	
+	if not os.path.exists(file):
+		print("Permutation for N Domains | {}".format(direction.title()))
+		
 		for i, k in enumerate(n_circuits):
 			if i % 10 == 0 and verbose:
 				print("   Processing {}th k".format(i))
-			with torch.no_grad():
-				function_features, structure_features = load_eval_data(features, k, ids)
-				y_pred_for = load_eval_preds(clf, fits["forward"][k], function_features)
-				y_true_for = structure_features
+			function_features, structure_features = load_eval_data(features, k, ids)
+			if direction == "forward":
+				x, y_true = function_features, structure_features
+			if direction == "reverse":
+				x, y_true = structure_features, function_features
+			y_pred = load_eval_preds(clf, fits[direction][k], x)
+			
 			for n in range(n_iter):
 				null = np.random.choice(range(len(ids)), size=len(ids), replace=False)
-				score_for = scoring_function(y_true_for[null,:], y_pred_for, average="macro")
-				eval_null["forward"][i,n] = score_for
-		pd.DataFrame(eval_null["forward"]).to_csv(file_for)
-	elif os.path.exists(file_for):
-		eval_null["forward"] = pd.read_csv(file_for, index_col=0, header=0).values
+				stats[direction][i,n] = func(y_true[null,:], y_pred, average="macro")
+		
+		pd.DataFrame(stats[direction]).to_csv(file)
+	
+	elif os.path.exists(file):
+		stats[direction] = pd.read_csv(file, index_col=0, header=0).values
 
-	file_rev = "{}data/circuits_{}_reverse_null_{}iter.csv".format(path, clf, n_iter)
-	if not os.path.exists(file_rev):
-		print("Permutation for N Domains | Reverse")
-		for i, k in enumerate(n_circuits):
-			if i % 10 == 0 and verbose:
-				print("   Processing {}th k".format(i))
-			with torch.no_grad():
-				function_features, structure_features = load_eval_data(features, k, ids)
-				y_pred_rev = load_eval_preds(clf, fits["reverse"][k], structure_features)
-				y_true_rev = function_features
-			for n in range(n_iter):
-				null = np.random.choice(range(len(ids)), size=len(ids), replace=False)
-				score_rev = scoring_function(y_true_rev[null,:], y_pred_rev, average="macro")
-				eval_null["reverse"][i,n] = score_rev
-		pd.DataFrame(eval_null["reverse"]).to_csv(file_rev)
-		print("")
-	elif os.path.exists(file_rev):
-		eval_null["reverse"] = pd.read_csv(file_rev, index_col=0, header=0).values
+	return stats
 
-	eval_null["mean"] = np.mean([eval_null["forward"], eval_null["reverse"]], axis=0)
-	return eval_null
+
+def compute_eval_null(clf, scoring_function, directions, n_circuits, features, fits, ids, 
+					  func=sklearn.metrics.roc_auc_score, n_iter=1000, verbose=True, path=""):
+	
+	stats = {direction: np.zeros((len(n_circuits), n_iter)) for direction in directions}
+	for direction in directions:
+		stats = compute_eval_null_direction(stats, direction, n_circuits, clf, features, fits, ids,
+											func=func, n_iter=n_iter, verbose=verbose, path=path)
+	stats["mean"] = np.mean([stats["forward"], stats["reverse"]], axis=0)
+	
+	return stats
+
+
+def compute_eval_stats(clf, directions, n_circuits, features, fits, ids, 
+					   func=sklearn.metrics.roc_auc_score, n_iter=1000, path=""):
+
+	stats = {}
+	stats["scores"] = compute_eval_scores(clf, func, directions, n_circuits, features, fits, ids)
+	stats["boot"] = compute_eval_boot(clf, func, directions, n_circuits, features, fits, ids, n_iter=n_iter, path=path)
+	stats["null"] = compute_eval_null(clf, func, directions, n_circuits, features, fits, ids, n_iter=n_iter, path=path)
+	
+	return stats
 
 
 def plot_scores(direction, n_circuits, stats, shape="o", op_k=6, interval=0.999, 
@@ -399,23 +388,29 @@ def plot_scores(direction, n_circuits, stats, shape="o", op_k=6, interval=0.999,
 
 
 def load_confidence_interval(distribution, direction, n_circuits, interval=0.999):
+
 	n_iter = float(distribution[direction].shape[1])
 	lower = [sorted(distribution[direction][k,:])[int(n_iter*(1.0-interval))] for k in range(len(n_circuits))]
 	upper = [sorted(distribution[direction][k,:])[int(n_iter*interval)] for k in range(len(n_circuits))]
+
 	return lower, upper
 
 
 def term_degree_centrality(i, lists, circuits, dtm, ids, reweight=False):
+
 	terms = list(set(lists.loc[lists["CLUSTER"] == i, "TOKEN"]))
 	ttm = pd.DataFrame(np.matmul(dtm.loc[ids, terms].T, dtm.loc[ids, terms]), 
 					   index=terms, columns=terms)
 	adj = pd.DataFrame(0, index=terms, columns=terms)
+	
 	for term_i in terms:
 		for term_j in terms:
 			adj.loc[term_i, term_j] = ttm.loc[term_i, term_j]
+	
 	degrees = adj.sum(axis=1)
 	degrees = degrees.loc[terms]
 	degrees = degrees.sort_values(ascending=False)
+
 	return degrees
 
 
@@ -456,6 +451,9 @@ def plot_wordclouds(framework, domains, lists, dtm, path="",
 		
 		def color_func(word, font_size, position, orientation, 
 					   random_state=None, idx=0, **kwargs):
+
+			# Adapted from https://amueller.github.io/word_cloud/auto_examples/a_new_hope.html
+
 			return style.palettes[framework][i]
 
 		tkns = lists.loc[lists["DOMAIN"] == dom, "TOKEN"]
@@ -593,6 +591,7 @@ def load_optimized_lists(doms, lists, list_lens, seed_df, vsm):
 
 
 def update_lists(doms, op_df, lists, framework, path=""):
+
 	columns = ["ORDER", "DOMAIN", "TOKEN", "SOURCE", "DISTANCE"]
 	new = pd.DataFrame(columns=columns)
 	for order, dom in enumerate(doms):
@@ -600,25 +599,34 @@ def update_lists(doms, op_df, lists, framework, path=""):
 		dom_df = lists.loc[lists["DOMAIN"] == dom][:list_len]
 		new = new.append(dom_df)
 	new.to_csv("{}lists/lists_{}_opsim.csv".format(path, framework), index=None)
+
 	return new
 
 
 def compute_centroid(df, labels, vsm, level="DOMAIN"):
+
 	centroids = []
 	for i, label in enumerate(labels):
 		tkns = df.loc[df[level] == label, "TOKEN"]
 		tkns = [tkn for tkn in tkns if tkn in vsm.index]
 		centroids.append(np.mean(vsm.loc[tkns]))
+
 	return np.array(centroids)
 
 
 def compute_sims_sample(df, seed_centroid, vsm):
+
+	from scipy.spatial.distance import cdist
+
 	idx = np.random.choice(range(vsm.shape[1]), size=vsm.shape[1], replace=True)
 	sims = cdist(seed_centroid[:,idx], df[:,idx], "cosine")
 	return np.diagonal(sims)
 
 
 def compute_sims_shuffle(df, seed_centroid, vsm):
+
+	from scipy.spatial.distance import cdist
+
 	idx_i = np.random.choice(range(vsm.shape[1]), size=vsm.shape[1], replace=False)
 	idx_j = np.random.choice(range(vsm.shape[1]), size=vsm.shape[1], replace=False)
 	sims = cdist(seed_centroid[:,idx_i], df[:,idx_j], "cosine")
@@ -626,12 +634,16 @@ def compute_sims_shuffle(df, seed_centroid, vsm):
 
 
 def compute_sims(df, seed_centroid, labels, vsm, level="DOMAIN"):
+
+	from scipy.spatial.distance import cdist
+
 	centroids = compute_centroid(df, labels, vsm, level=level)
 	sims = cdist(seed_centroid, centroids, "cosine")
 	return np.diagonal(sims) 
 
 
 def report_significance(pvals, labels, alphas=[0.01, 0.001, 0.0001]):
+
 	for p, lab in zip(pvals, labels):
 		stars = "".join(["*" for alpha in alphas if p < alpha])
 		print("{:22s} p={:6.6f} {}".format(lab, p, stars))

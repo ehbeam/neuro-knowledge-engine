@@ -1,53 +1,17 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
-import os, pickle, random
+import os, pickle
 import pandas as pd
 import numpy as np
-from collections import OrderedDict
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import ParameterSampler
 
-
-def doc_mean_thres(df):
-	doc_mean = df.mean()
-	df_bin = 1.0 * (df.values > doc_mean.values)
-	df_bin = pd.DataFrame(df_bin, columns=df.columns, index=df.index)
-	return df_bin
-
-
-def load_coordinates():
-	atlas_labels = pd.read_csv("../../data/brain/labels.csv")
-	activations = pd.read_csv("../../data/brain/coordinates.csv", index_col=0)
-	activations = activations[atlas_labels["PREPROCESSED"]]
-	return activations
-
-
-def load_doc_term_matrix(version=190325, binarize=True):
-	dtm = pd.read_csv("../../data/text/dtm_{}.csv.gz".format(version), compression="gzip", index_col=0)
-	if binarize:
-		dtm = doc_mean_thres(dtm)
-	return dtm
-
-
-def load_framework(framework, suffix=""):
-	list_file = "../../ontology/lists/lists_{}{}.csv".format(framework, suffix)
-	lists = pd.read_csv(list_file, index_col=None)
-	circuit_file = "../../ontology/circuits/circuits_{}.csv".format(framework)
-	circuits = pd.read_csv(circuit_file, index_col=0)
-	return lists, circuits
-
-
-def score_lists(lists, dtm_bin, label_var="DOMAIN"):
-	labels = OrderedDict.fromkeys(lists[label_var])
-	list_counts = pd.DataFrame(index=dtm_bin.index, columns=labels)
-	for label in list_counts.columns:
-		tkns = lists.loc[lists[label_var] == label, "TOKEN"]
-		list_counts[label] = dtm_bin[tkns].sum(axis=1)
-	list_scores = doc_mean_thres(list_counts)
-	return list_scores
+import sys
+sys.path.append("../..")
+import utilities
 
 
 def optimize_hyperparameters(param_list, train_set, val_set, max_iter=500):
@@ -81,7 +45,7 @@ def optimize_hyperparameters(param_list, train_set, val_set, max_iter=500):
 	return op_fit
 
 
-def train_classifier(framework, direction, suffix="", dtm_version=190325):
+def train_classifier(framework, direction, suffix="", clf="", dtm_version=190325):
 
 	fit_file = "fits/{}_{}.p".format(framework, direction)
 	if not os.path.isfile(fit_file):
@@ -92,12 +56,12 @@ def train_classifier(framework, direction, suffix="", dtm_version=190325):
 			splits[split] = [int(pmid.strip()) for pmid in open("../../data/splits/{}.txt".format(split), "r").readlines()]
 
 		# Load the activation coordinate and text data
-		act_bin = load_coordinates()
-		dtm_bin = load_doc_term_matrix(version=dtm_version, binarize=True)
+		act_bin = utilities.load_coordinates(path="../../data")
+		dtm_bin = utilities.load_doc_term_matrix(version=dtm_version, binarize=True, path="../../data")
 		
 		# Score the texts using the framework
-		lists, circuits = load_framework(framework, suffix=suffix)
-		scores = score_lists(lists, dtm_bin)
+		lists, circuits = utilities.load_framework(framework, suffix=suffix, clf=clf, path="../../ontology")
+		scores = utilities.score_lists(lists, dtm_bin)
 			
 		# Specify the hyperparameters for the randomized grid search
 		param_grid = {"penalty": ["l1", "l2"],
@@ -122,8 +86,8 @@ def train_classifier(framework, direction, suffix="", dtm_version=190325):
 		pickle.dump(op_fit, open(fit_file, "wb"), protocol=2)
 		
 
-train_classifier("data-driven", "forward", suffix="_lr", dtm_version=190325)
-train_classifier("data-driven", "reverse", suffix="_lr", dtm_version=190325)
+train_classifier("data-driven", "forward", clf="_lr", dtm_version=190325)
+train_classifier("data-driven", "reverse", clf="_lr", dtm_version=190325)
 train_classifier("rdoc", "forward", suffix="_opsim", dtm_version=190325)
 train_classifier("rdoc", "reverse", suffix="_opsim", dtm_version=190325)
 train_classifier("dsm", "forward", suffix="_opsim", dtm_version=190325)

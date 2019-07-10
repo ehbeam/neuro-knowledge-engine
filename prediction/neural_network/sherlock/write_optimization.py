@@ -4,15 +4,16 @@ import os
 
 frameworks = ["data-driven", "rdoc", "dsm"]
 suffixes = ["", "_opsim", "_opsim"]
+clfs = ["_nn", "", ""]
 
-for framework, suffix in zip(frameworks, suffixes):
+for framework, suffix, clf in zip(frameworks, suffixes, clfs):
     
     for direction in ["forward", "reverse"]:
     
         # Python file
-        comm = "neural_network.train_classifier('{}', '{}', suffix='{}')".format(framework, direction, suffix)
+        comm = "prediction.train_classifier('{}', '{}', suffix='{}', clf='{}')".format(framework, direction, suffix, clf)
         pyfile = open("opt_{}_{}.py".format(framework, direction), "w+")
-        pyfile.write("#!/bin/python\n\nimport neural_network\n{}".format(comm))
+        pyfile.write("#!/bin/python\n\nimport sys\nsys.path.append('..')\nimport prediction\n\n{}".format(comm))
         pyfile.close()
         
         # Sbatch file

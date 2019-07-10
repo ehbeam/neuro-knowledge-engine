@@ -1,4 +1,7 @@
 #!/bin/python
 
-import neural_network
-neural_network.train_classifier('dsm', 'reverse', suffix='_opsim', use_hyperparams=True)
+import sys
+sys.path.append('..')
+import prediction
+
+prediction.train_classifier('dsm', 'reverse', suffix='_opsim', clf='', use_hyperparams=True)
