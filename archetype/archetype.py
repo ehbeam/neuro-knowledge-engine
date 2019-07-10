@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import collections
 import pandas as pd
 import numpy as np
 np.random.seed(42)
@@ -9,113 +10,65 @@ sys.path.append("..")
 import utilities
 
 
-def plot_violins(framework, domains, df, df_null, df_obs, palette, metric="arche",
-				 dx=[], dy=0.06, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001],
-				 ylim=[-0.1, 0.85], yticks=[0, 0.25, 0.5, 0.75], print_fig=True, 
-				 font=utilities.arial, path="", suffix=""):
+def compute_gen_stats(stats, framework, lists, dom2docs, sorted_pmids, clf=""):
 
-	import matplotlib.pyplot as plt
-	from matplotlib import cm, font_manager, rcParams
-
-	font_prop = font_manager.FontProperties(fname=font, size=20)
-	rcParams["axes.linewidth"] = 1.5
-
-	# Set up figure
-	fig = plt.figure(figsize=(4.5, 2.1))
-	ax = fig.add_axes([0,0,1,1])
-
-	# Violin plot of observed values
-	for i, dom in enumerate(domains):
-		data = sorted(df_obs.loc[dom].dropna())
-		obs = df.loc[dom, "OBSERVED"]
-		v = ax.violinplot(data, positions=[i], 
-						  showmeans=False, showmedians=False, widths=0.85)
-		for pc in v["bodies"]:
-			pc.set_facecolor(palette[i])
-			pc.set_edgecolor(palette[i])
-			pc.set_linewidth(1.25)
-			pc.set_alpha(0.4)
-		for line in ["cmaxes", "cmins", "cbars"]:
-			v[line].set_edgecolor("none")
-		plt.plot([i-dx[i], i+dx[i]], [obs, obs], 
-					c=palette[i], alpha=1, lw=2)
-
-		# Comparison test
-		dys = dy * np.array([0, 1, 2])
-		for alpha, y in zip(alphas, dys):
-			if df["FDR"][i] < alpha:
-				plt.text(i-ds, max(data) + y, "*", fontproperties=font_prop)
-
-	# Confidence interval of null distribution
-	n_iter = df_null.shape[1]
-	lower = [sorted(df_null.loc[dom])[int(n_iter*(1.0-interval))] for dom in domains]
-	upper = [sorted(df_null.loc[dom])[int(n_iter*interval)] for dom in domains]
-	plt.fill_between(range(len(domains)), lower, upper, 
-					 alpha=0.2, color="gray")
-	plt.plot(df_null.values.mean(axis=1), linestyle="dashed", color="gray", linewidth=2)
-
-	# Set plot parameters
-	plt.xticks(range(len(domains)), [""]*len(domains))
-	plt.yticks(yticks, fontproperties=font_prop)
-	plt.xlim([-0.75, len(domains)-0.35])
-	plt.ylim(ylim)
-	for side in ["right", "top"]:
-		ax.spines[side].set_visible(False)
-	ax.xaxis.set_tick_params(width=1.5, length=7)
-	ax.yaxis.set_tick_params(width=1.5, length=7)
-
-	# Export figure
-	plt.savefig("{}figures/{}_{}{}_{}iter.png".format(
-				path, metric, framework, suffix, n_iter), dpi=250, bbox_inches="tight")
-	if print_fig:
-		plt.show()
-	plt.close()
-
-
-def plot_framework_comparison(boot, obs, n_iter=1000, dx=0.38, ylim=[0.4,0.65], yticks=[], 
-							  print_fig=True, font=utilities.arial, path="", suffix=""):
+	df_obs = pd.DataFrame(index=domains, columns=pmids)
+	for dom in domains:
+		dom_pmids = dom2docs[dom]
+		dom_vecs = docs.loc[dom_pmids].values
+		dom_arche = archetypes[dom].values.reshape(1, archetypes.shape[0])
+		dom_sims = 1.0 - cdist(dom_vecs, dom_arche, metric="dice")
+		df_obs.loc[dom, dom_pmids] = dom_sims[:,0]
+	df = pd.DataFrame({"OBSERVED": df_obs.mean(axis=1)}, index=domains)
 	
-	import matplotlib.pyplot as plt
-	from matplotlib import font_manager, rcParams
+	df_obs.to_csv("{}data/arche_obs_{}.csv".format(path, framework))
+	df.to_csv("{}data/arche_mean_{}.csv".format(path, framework))
 
-	font_prop = font_manager.FontProperties(fname=font, size=20)
-	rcParams["axes.linewidth"] = 1.5
+	stats["obs"][framework] = df_obs
+	stats["mean"][framework] = df
 
-	# Set up figure
-	fig = plt.figure(figsize=(2.1, 2.1))
-	ax = fig.add_axes([0,0,1,1])
+	file_null = "{}data/arche_null_{}_{}iter.csv".format(path, framework, n_iter)
+	if not os.path.isfile(file_null):
+		print("\tComputing null distribution")
+		df_null = np.zeros((len(domains), n_iter))
+		for n in range(n_iter):
+			null = np.random.choice(range(len(docs.columns)), 
+									size=len(docs.columns), replace=False)
+			for i, dom in enumerate(domains):
+				dom_pmids = dom2docs[dom]
+				dom_vecs = docs.loc[dom_pmids].values
+				dom_arche = archetypes.values[null,i].reshape(1, archetypes.shape[0])
+				df_null[i,n] = 1.0 - np.mean(cdist(dom_vecs, dom_arche, metric="dice"))
+			if n % int(n_iter / 10.0) == 0:
+				print("\t\tProcessed {} iterations".format(n))
+		df_null = pd.DataFrame(df_null, index=domains, columns=range(n_iter))
+		df_null.to_csv(file_null)
+	else:
+		df_null = pd.read_csv(file_null, index_col=0, header=0)
 
-	i = 0
-	labels = []
-	for fw, dist in boot.items():
-		labels.append(utilities.names[fw])
-		dist_avg = np.mean(dist, axis=0)
-		macro_avg = np.mean(obs[fw]["OBSERVED"])
-		plt.plot([i-dx, i+dx], [macro_avg, macro_avg], 
-				 c="gray", alpha=1, lw=2, zorder=-1)
-		v = ax.violinplot(sorted(dist_avg), positions=[i], 
-						  showmeans=False, showmedians=False, widths=0.85)
-		for pc in v["bodies"]:
-			pc.set_facecolor("gray")
-			pc.set_edgecolor("gray")
-			pc.set_linewidth(2)
-			pc.set_alpha(0.5)
-		for line in ["cmaxes", "cmins", "cbars"]:
-			v[line].set_edgecolor("none")
-		i += 1
+	stats["null"][framework] = df_null
 
-	ax.set_xticks(range(len(boot.keys())))
-	ax.set_xticklabels([], rotation=60, ha="right")
-	plt.xticks(fontproperties=font_prop)
-	plt.yticks(yticks, fontproperties=font_prop)
-	plt.xlim([-0.75, len(boot.keys())-0.25])
-	plt.ylim(ylim)
-	for side in ["right", "top"]:
-		ax.spines[side].set_visible(False)
-	ax.xaxis.set_tick_params(width=1.5, length=7)
-	ax.yaxis.set_tick_params(width=1.5, length=7)
-	plt.savefig("{}figures/arche_{}_{}iter.png".format(path, suffix, n_iter), 
-				dpi=250, bbox_inches="tight")
-	if print_fig:
-		plt.show()
-	plt.close()
+	file_boot = "{}data/arche_boot_{}_{}iter.csv".format(path, framework, n_iter)
+	if not os.path.isfile(file_boot):
+		print("\tComputing bootstrap distribution")
+		df_boot = np.zeros((len(domains), n_iter))
+		for n in range(n_iter):
+			boot = np.random.choice(range(len(docs.columns)), 
+									size=len(docs.columns), replace=True)
+			for i, dom in enumerate(domains):
+				dom_pmids = dom2docs[dom]
+				dom_vecs = docs.loc[dom_pmids].values[:,boot]
+				dom_arche = archetypes.values[boot,i].reshape(1, archetypes.shape[0])
+				df_boot[i,n] = 1.0 - np.mean(cdist(dom_vecs, dom_arche, metric="dice"))
+			if n % int(n_iter / 10.0) == 0:
+				print("\t\tProcessed {} iterations".format(n))
+		df_boot = pd.DataFrame(df_boot, index=domains, columns=range(n_iter))
+		df_boot.to_csv(file_boot)
+	else:
+		df_boot = pd.read_csv(file_boot, index_col=0, header=0)
+
+	stats["boot"][framework] = df_boot
+
+	stats = utilities.compare_to_null(df_null, df, n_iter, alpha=args.alpha)
+	
+	return stats

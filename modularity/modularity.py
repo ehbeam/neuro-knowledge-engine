@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import collections
 import pandas as pd
 import numpy as np
 np.random.seed(42)
@@ -8,112 +9,110 @@ import sys
 sys.path.append("..")
 import utilities
 
-def plot_violins(framework, domains, df, df_null, df_obs, palette, metric="mod",
-				 dx=[], dy=0.5, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001], ylim=[0.5,8.5], 
-				 yticks=[2,4,6,8], font=utilities.arial, print_fig=True, path="", suffix=""):
 
-	import matplotlib.pyplot as plt
-	from matplotlib import cm, font_manager, rcParams
+def compute_mod_stats(stats, framework, lists, dom2docs, doc2dom, dists, clf="", n_iter=1000, alpha=0.001, path=""):
 
-	font_prop = font_manager.FontProperties(fname=font, size=20)
-	rcParams["axes.linewidth"] = 1.5
+	file_obs = "{}data/mod_obs_{}{}.csv".format(path, framework, clf)
+	print("\tComputing observed values")
 
-	# Set up figure
-	fig = plt.figure(figsize=(4.5, 2.1))
-	ax = fig.add_axes([0,0,1,1])
+	sorted_pmids = []
+	for dom in range(len(circuits.columns)):
+		sorted_pmids += [pmid for pmid, sys in doc2dom.items() if sys == dom + 1]
+	sorted_dists = dists[sorted_pmids].loc[sorted_pmids]
 
-	# Violin plot of observed values
-	for i, dom in enumerate(domains):
-		data = sorted(df_obs.loc[dom].dropna())
-		obs = df.loc[dom, "OBSERVED"]
-		v = ax.violinplot(data, positions=[i], 
-						  showmeans=False, showmedians=False, widths=0.85)
-		for pc in v["bodies"]:
-			pc.set_facecolor(palette[i])
-			pc.set_edgecolor(palette[i])
-			pc.set_linewidth(1.25)
-			pc.set_alpha(0.4)
-		for line in ["cmaxes", "cmins", "cbars"]:
-			v[line].set_edgecolor("none")
-		plt.plot([i-dx[i], i+dx[i]], [obs, obs], 
-					c=palette[i], alpha=1, lw=2)
+	domains = list(collections.OrderedDict.fromkeys(lists["DOMAIN"]))
+	dom_idx = {dom: {"min": 0, "max": 0} for dom in domains}
+	for dom in domains:
+		dom_pmids = dom2docs[dom]
+		dom_idx[dom]["min"] = sorted_pmids.index(dom_pmids[0])
+		dom_idx[dom]["max"] = sorted_pmids.index(dom_pmids[-1]) + 1
 
-		# Comparison test
-		dys = dy * np.array([0, 1, 2])
-		for alpha, y in zip(alphas, dys):
-			if df["FDR"][i] < alpha:
-				plt.text(i-ds, min(max(data), 9.5) + y, "*", 
-						 fontproperties=font_prop)
+	dists_int, dists_ext = {}, {}
+	df_obs = pd.DataFrame(index=domains, columns=pmids)
+	df = pd.DataFrame(index=domains, columns=["OBSERVED"])
 
-	# Confidence interval of null distribution
-	n_iter = df_null.shape[1]
-	lower = [sorted(df_null.loc[dom])[int(n_iter*(1.0-interval))] for dom in domains]
-	upper = [sorted(df_null.loc[dom])[int(n_iter*interval)] for dom in domains]
-	plt.fill_between(range(len(domains)), lower, upper, 
-					 alpha=0.18, color="gray")
-	plt.plot(df_null.values.mean(axis=1), linestyle="dashed", color="gray", linewidth=2)
+	for dom in domains:
+		
+		dom_min, dom_max = dom_idx[dom]["min"], dom_idx[dom]["max"]
+		dom_dists = sorted_dists.values[:,dom_min:dom_max][dom_min:dom_max,:]
+		dists_int[dom] = dom_dists.ravel()
+		dist_int = np.nanmean(dom_dists)
+		sorted_dists_int = np.mean(dom_dists, axis=0)
+		
+		other_dists_lower = sorted_dists.values[:,dom_min:dom_max][:dom_min,:]
+		other_dists_upper = sorted_dists.values[:,dom_min:dom_max][dom_max:,:]
+		other_dists = np.concatenate((other_dists_lower, other_dists_upper))
+		dists_ext[dom] = other_dists.ravel()
+		dist_ext = np.nanmean(other_dists)
+		sorted_dists_ext = np.mean(other_dists, axis=0)
+		
+		df.loc[dom, "OBSERVED"] = dist_ext / dist_int
+		df_obs.loc[dom, dom2docs[dom]] = sorted_dists_ext / sorted_dists_int
 
-	# Set plot parameters
-	plt.xticks(range(len(domains)), [""]*len(domains))
-	plt.yticks(yticks, fontproperties=font_prop)
-	plt.xlim([-0.75, len(domains)-0.35])
-	plt.ylim(ylim)
-	for side in ["right", "top"]:
-		ax.spines[side].set_visible(False)
-	ax.xaxis.set_tick_params(width=1.5, length=7)
-	ax.yaxis.set_tick_params(width=1.5, length=7)
+		df.to_csv(file_obs)	
 
-	# Export figure
-	plt.savefig("{}figures/{}_{}{}_{}iter.png".format(
-				path, metric, framework, suffix, n_iter), dpi=250, bbox_inches="tight")
-	if print_fig:
-		plt.show()
-	plt.close()
+	stats["obs"][framework] = df_obs
+	stats["mean"][framework] = df
 
+	null_dists = sorted_dists.values.copy()
+	file_null = "{}data/mod_null_{}{}_{}iter.csv".format(path, framework, clf, n_iter)
+	if not os.path.isfile(file_null):
+		print("\tComputing null distribution")
+		df_null = np.empty((len(domains), n_iter))
+		
+		for n in range(n_iter):
+			np.random.shuffle(null_dists)
+			
+			for i, dom in enumerate(domains):
+				
+				dom_min, dom_max = dom_idx[dom]["min"], dom_idx[dom]["max"]
+				dom_dists = null_dists[:,dom_min:dom_max][dom_min:dom_max,:]
+				dist_int = np.nanmean(dom_dists)
 
-def plot_framework_comparison(boot, obs, n_iter=1000, print_fig=True,
-							  dx=0.38, ylim=[0.4,0.65], yticks=[], font=utilities.arial, suffix=""):
+				other_dists_lower = null_dists[:,dom_min:dom_max][:dom_min,:]
+				other_dists_upper = null_dists[:,dom_min:dom_max][dom_max:,:]
+				other_dists = np.concatenate((other_dists_lower, other_dists_upper))
+				dist_ext = np.nanmean(other_dists)
+				
+				df_null[i,n] = dist_ext / dist_int
+				
+			if n % int(n_iter / 10.0) == 0:
+				print("\t\tProcessed {} iterations".format(n))
+		
+		df_null = pd.DataFrame(df_null, index=domains, columns=range(n_iter))
+		df_null.to_csv(file_null)
 	
-	import matplotlib.pyplot as plt
-	from matplotlib import font_manager, rcParams
+	else:
+		df_null = pd.read_csv(file_null, index_col=0, header=0)
+
+	stats["null"][framework] = df_null
+
+	file_boot = "{}data/mod_boot_{}{}_{}iter.csv".format(path, framework, clf, n_iter)
+	if not os.path.isfile(file_boot):
+		print("\tComputing bootstrap distribution")
+		df_boot = np.empty((len(domains), n_iter))
+		
+		for n in range(n_iter):
+			for i, dom in enumerate(domains):
+				
+				boot_int = np.random.choice(dists_int[dom], size=len(dists_int[dom]), replace=True)
+				dist_int = np.nanmean(boot_int)
+				
+				boot_ext = np.random.choice(dists_ext[dom], size=len(dists_ext[dom]), replace=True)
+				dist_ext = np.nanmean(boot_ext)
+				
+				df_boot[i,n] = dist_ext / dist_int
+				
+			if n % int(n_iter / 10.0) == 0:
+				print("\t\tProcessed {} iterations".format(n))
+				
+		df_boot = pd.DataFrame(df_boot, index=domains, columns=range(n_iter))
+		df_boot.to_csv(file_boot)
+	else:
+		df_boot = pd.read_csv(file_boot, index_col=0, header=0)
+
+	stats["boot"][framework] = df_boot
+
+	stats["null_comparison"][framework] = utilities.compare_to_null(df_null, df, args.n_iter, alpha=alpha)
 	
-	font_lg = font_manager.FontProperties(fname=font, size=20)
-	rcParams["axes.linewidth"] = 1.5
-
-	fig = plt.figure(figsize=(2.1, 2.1))
-	ax = fig.add_axes([0,0,1,1])
-
-	i = 0
-	labels = []
-	for fw, dist in boot.items():
-		labels.append(utilities.names[fw])
-		dist_avg = np.mean(dist, axis=0)
-		macro_avg = np.mean(obs[fw]["OBSERVED"])
-		plt.plot([i-dx, i+dx], [macro_avg, macro_avg], 
-				 c="gray", alpha=1, lw=2, zorder=-1)
-		v = ax.violinplot(sorted(dist_avg), positions=[i], 
-						  showmeans=False, showmedians=False, widths=0.85)
-		for pc in v["bodies"]:
-			pc.set_facecolor("gray")
-			pc.set_edgecolor("gray")
-			pc.set_linewidth(2)
-			pc.set_alpha(0.5)
-		for line in ["cmaxes", "cmins", "cbars"]:
-			v[line].set_edgecolor("none")
-		i += 1
-
-	ax.set_xticks(range(len(boot.keys())))
-	ax.set_xticklabels([], rotation=60, ha="right")
-	plt.xticks(fontproperties=font_lg)
-	plt.yticks(yticks, fontproperties=font_lg)
-	plt.xlim([-0.75, len(boot.keys())-0.25])
-	plt.ylim(ylim)
-	for side in ["right", "top"]:
-		ax.spines[side].set_visible(False)
-	ax.xaxis.set_tick_params(width=1.5, length=7)
-	ax.yaxis.set_tick_params(width=1.5, length=7)
-	plt.savefig("figures/mod_{}_{}iter.png".format(suffix, n_iter), 
-				dpi=250, bbox_inches="tight")
-	if print_fig:
-		plt.show()
-	plt.close()
+	return stats

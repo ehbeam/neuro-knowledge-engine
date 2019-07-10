@@ -4,24 +4,11 @@ import pandas as pd
 import numpy as np
 np.random.seed(42)
 
+from style import style
+
 
 names = {"data-driven": "Data-Driven", "rdoc": "RDoC", "dsm": "DSM"}
 suffix = {"data-driven": "", "rdoc": "_opsim", "dsm": "_opsim"}
-
-c = {"red": "#CE7D69", "orange": "#BA7E39", "yellow": "#CEBE6D", 
-	 "chartreuse": "#AEC87C", "green": "#77B58A", "blue": "#7597D0", 
-	 "magenta": "#B07EB6", "purple": "#7D74A3", "brown": "#846B43", "pink": "#CF7593"}
-
-palettes = {"data-driven": [c["blue"], c["magenta"], c["yellow"], c["green"], c["red"], c["purple"], c["chartreuse"], c["orange"], c["pink"], c["brown"]],
-			"rdoc": [c["blue"], c["red"], c["green"], c["purple"], c["yellow"], c["orange"]],
-			"dsm": [c["purple"], c["chartreuse"], c["orange"], c["blue"], c["red"], c["magenta"], c["yellow"], c["green"], c["brown"]]}
-
-colormaps = {"data-driven": ["Blues", cmaps["Magentas"], cmaps["Yellows"], "Greens", "Reds", cmaps["Purples"]],
-			 "rdoc": ["Blues", "Reds", "Greens", cmaps["Purples"], cmaps["Yellows"], "Oranges"],
-			 "dsm": [cmaps["Purples"], cmaps["Chartreuses"], "Oranges", "Blues", "Reds", 
-			 cmaps["Magentas"], cmaps["Yellows"], "Greens", cmaps["Browns"]]}
-
-arial = "../style/Arial Unicode.ttf"
 
 
 def doc_mean_thres(df):
@@ -38,12 +25,12 @@ def load_coordinates(path="../data"):
 	return activations
 
 
-def load_lexicon(sources, path="../lexicon", tkn_filter=None):
+def load_lexicon(sources, path="../lexicon", tkn_filter=[]):
 	lexicon = []
 	for source in sources:
 		file = "{}/lexicon_{}.txt".format(path, source)
 		lexicon += [token.strip() for token in open(file, "r").readlines()]
-	if tkn_filter:
+	if len(tkn_filter) > 0:
 		lexicon = sorted(list(set(lexicon).intersection(tkn_filter)))
 	return sorted(lexicon)
 
@@ -55,10 +42,12 @@ def load_doc_term_matrix(version=190124, binarize=True, path="../data"):
 	return dtm
 
 
-def load_framework(framework, list_suffix="", clf_suffix="", path="../ontology"):
-	list_file = "{}/lists/lists_{}{}{}.csv".format(path, framework, list_suffix, clf_suffix)
+def load_framework(framework, suffix="", clf="", path="../ontology"):
+	if path.endswith("/"):
+		path = path[:-1]
+	list_file = "{}/lists/lists_{}{}{}.csv".format(path, framework, suffix, clf)
 	lists = pd.read_csv(list_file, index_col=None)
-	circuit_file = "{}/circuits/circuits_{}{}.csv".format(path, framework, clf_suffix)
+	circuit_file = "{}/circuits/circuits_{}{}.csv".format(path, framework, clf)
 	circuits = pd.read_csv(circuit_file, index_col=0)
 	return lists, circuits
 
@@ -87,41 +76,6 @@ def transparent_background(file_name):
 			newData.append(item)
 	img.putdata(newData)
 	img.save(file_name, "PNG")
-
-
-def make_cmap(colors, position=None, bit=False):
-	# Adapted from http://schubert.atmos.colostate.edu/~cslocum/custom_cmap.html
-	
-	import matplotlib as mpl
-	import numpy as np
-	bit_rgb = np.linspace(0,1,256)
-	if position == None:
-		position = np.linspace(0,1,len(colors))
-	else:
-		if len(position) != len(colors):
-			sys.exit("position length must be the same as colors")
-		elif position[0] != 0 or position[-1] != 1:
-			sys.exit("position must start with 0 and end with 1")
-	if bit:
-		for i in range(len(colors)):
-			colors[i] = (bit_rgb[colors[i][0]],
-						 bit_rgb[colors[i][1]],
-						 bit_rgb[colors[i][2]])
-	cdict = {'red':[], 'green':[], 'blue':[]}
-	for pos, color in zip(position, colors):
-		cdict['red'].append((pos, color[0], color[0]))
-		cdict['green'].append((pos, color[1], color[1]))
-		cdict['blue'].append((pos, color[2], color[2]))
-
-	cmap = mpl.colors.LinearSegmentedColormap("my_colormap",cdict,256)
-	return cmap
-
-
-cmaps = {"Yellows": make_cmap([(1,1,1), (0.937,0.749,0)]), 
-		 "Magentas": make_cmap([(1,1,1), (0.620,0,0.686)]), 
-		 "Purples": make_cmap([(1,1,1), (0.365,0,0.878)]),
-		 "Chartreuses": make_cmap([(1,1,1), (0.345,0.769,0)]),
-		 "Browns": make_cmap([(1,1,1), (0.82,0.502,0)])}
 
 
 def load_atlas(path="../data"):
@@ -210,20 +164,168 @@ def map_plane(estimates, atlas, path, suffix="", plane="z", cbar=False, annotate
 		display.close()
 
 
-def compare_to_null(df_null, df, domains, n_iter, alpha=0.001):
+def compare_to_null(df_null, df, n_iter, alpha=0.001):
+	
 	from statsmodels.stats.multitest import multipletests
+	
 	pval = []
-	for dom in domains:
+	for dom in df.index:
 		dom_null = df_null.loc[dom].values
 		dom_obs = float(df.loc[dom, "OBSERVED"])
 		p = np.sum(dom_null >= dom_obs) / float(n_iter)
 		pval.append(p)
 		df.loc[dom, "P"] = p
 	df["FDR"] = multipletests(pval, method="fdr_bh")[1]
-	for dom in domains:
-		if df.loc[dom, "FDR"] < alpha:
-			df.loc[dom, "STARS"] = "*"
-		else:
-			df.loc[dom, "STARS"] = ""
-	df = df.loc[domains, ["OBSERVED", "P", "FDR", "STARS"]]
 	return df
+
+
+def compare_bootstraps(stats, frameworks, n_iter=1000):
+
+	from statsmodels.stats.multitest import multipletests
+
+	p = np.empty((len(frameworks), len(frameworks)))
+	for i, fw_i in enumerate(frameworks):
+	    for j, fw_j in enumerate(frameworks):
+	        boot_i = np.mean(stats["boot"][fw_i], axis=0)
+	        boot_j = np.mean(stats["boot"][fw_j], axis=0)
+	        p[i,j] = np.sum((boot_i - boot_j) <= 0.0) / float(n_iter)
+	fdr = multipletests(p.ravel(), method="fdr_bh")[1].reshape(p.shape)
+	fdr = pd.DataFrame(fdr, index=frameworks, columns=frameworks)
+
+	return fdr
+
+
+def load_stat_file(stats, stat_name, metric, stat, framework, suffix="", path=""):
+	
+	file = "{}data/{}_{}_{}{}.csv".format(path, metric, stat_name, framework, suffix)
+	stats[stat_name][framework] = pd.read_csv(file, index_col=0, header=0)
+	
+	return stats
+
+
+def load_partition_stats(stats, metric, framework, lists, dom2docs, n_iter=1000, alpha=0.001, clf="", path=""):
+
+	stat_names = ["obs", "mean", "null", "boot"]
+	iter_suffixes = ["", "", "_{}iter".format(n_iter), "_{}iter".format(n_iter)]
+
+	for stat_name, iter_suffix in zip(stat_names, iter_suffixes):
+		suffix = clf + iter_suffix
+		stats = load_stat_file(stats, stat_name, metric, stat_name, framework, suffix=suffix, path=path)
+
+	stats["null_comparison"][framework] = compare_to_null(stats["null"][framework], stats["mean"][framework], n_iter, alpha=alpha)
+
+	return stats
+
+
+def plot_violins(framework, domains, df_obs, df_null, df_stat, palette, metric="",
+				 dx=[], dy=0.06, ds=0.115, interval=0.999, alphas=[0.01, 0.001, 0.0001],
+				 ylim=[-0.1, 0.85], yticks=[0, 0.25, 0.5, 0.75], print_fig=True, 
+				 font=style.font, path="", suffix=""):
+
+	import matplotlib.pyplot as plt
+	from matplotlib import cm, font_manager, rcParams
+
+	font_prop = font_manager.FontProperties(fname=font, size=20)
+	rcParams["axes.linewidth"] = 1.5
+
+	# Set up figure
+	fig = plt.figure(figsize=(4.5, 2.1))
+	ax = fig.add_axes([0,0,1,1])
+
+	# Violin plot of observed values
+	for i, dom in enumerate(domains):
+		data = sorted(df_obs.loc[dom].dropna())
+		obs = df_stat.loc[dom, "OBSERVED"]
+		v = ax.violinplot(data, positions=[i], 
+						  showmeans=False, showmedians=False, widths=0.85)
+		for pc in v["bodies"]:
+			pc.set_facecolor(palette[i])
+			pc.set_edgecolor(palette[i])
+			pc.set_linewidth(1.25)
+			pc.set_alpha(0.4)
+		for line in ["cmaxes", "cmins", "cbars"]:
+			v[line].set_edgecolor("none")
+		plt.plot([i-dx[i], i+dx[i]], [obs, obs], 
+					c=palette[i], alpha=1, lw=2)
+
+		# Comparison test
+		dys = dy * np.array([0, 1, 2])
+		for alpha, y in zip(alphas, dys):
+			if df_stat["FDR"][i] < alpha:
+				plt.text(i-ds, max(data) + y, "*", fontproperties=font_prop)
+
+	# Confidence interval of null distribution
+	n_iter = df_null.shape[1]
+	lower = [sorted(df_null.loc[dom])[int(n_iter*(1.0-interval))] for dom in domains]
+	upper = [sorted(df_null.loc[dom])[int(n_iter*interval)] for dom in domains]
+	plt.fill_between(range(len(domains)), lower, upper, 
+					 alpha=0.2, color="gray")
+	plt.plot(df_null.values.mean(axis=1), linestyle="dashed", color="gray", linewidth=2)
+
+	# Set plot parameters
+	plt.xticks(range(len(domains)), [""]*len(domains))
+	plt.yticks(yticks, fontproperties=font_prop)
+	plt.xlim([-0.75, len(domains)-0.35])
+	plt.ylim(ylim)
+	for side in ["right", "top"]:
+		ax.spines[side].set_visible(False)
+	ax.xaxis.set_tick_params(width=1.5, length=7)
+	ax.yaxis.set_tick_params(width=1.5, length=7)
+
+	# Export figure
+	plt.savefig("{}figures/{}_{}{}_{}iter.png".format(
+				path, metric, framework, suffix, n_iter), dpi=250, bbox_inches="tight")
+	if print_fig:
+		plt.show()
+	plt.close()
+
+
+def plot_framework_comparison(boot, obs, mean, n_iter=1000, print_fig=True, font=style.font, dx=0.38, 
+							  ylim=[0.4,0.65], yticks=[], metric="mod", suffix="", path=""):
+	
+	import matplotlib.pyplot as plt
+	from matplotlib import font_manager, rcParams
+	
+	font_lg = font_manager.FontProperties(fname=font, size=20)
+	rcParams["axes.linewidth"] = 1.5
+
+	fig = plt.figure(figsize=(2.1, 2.1))
+	ax = fig.add_axes([0,0,1,1])
+
+	i = 0
+	labels = []
+	for fw, dist in boot.items():
+		labels.append(names[fw])
+		dist_avg = np.mean(dist, axis=0)
+		macro_avg = np.mean(mean[fw]["OBSERVED"])
+		plt.plot([i-dx, i+dx], [macro_avg, macro_avg], 
+				 c="gray", alpha=1, lw=2, zorder=-1)
+		v = ax.violinplot(sorted(dist_avg), positions=[i], 
+						  showmeans=False, showmedians=False, widths=0.85)
+		for pc in v["bodies"]:
+			pc.set_facecolor("gray")
+			pc.set_edgecolor("gray")
+			pc.set_linewidth(2)
+			pc.set_alpha(0.5)
+		for line in ["cmaxes", "cmins", "cbars"]:
+			v[line].set_edgecolor("none")
+		i += 1
+
+	ax.set_xticks(range(len(boot.keys())))
+	ax.set_xticklabels([], rotation=60, ha="right")
+	plt.xticks(fontproperties=font_lg)
+	plt.yticks(yticks, fontproperties=font_lg)
+	plt.xlim([-0.75, len(boot.keys())-0.25])
+	plt.ylim(ylim)
+	for side in ["right", "top"]:
+		ax.spines[side].set_visible(False)
+	ax.xaxis.set_tick_params(width=1.5, length=7)
+	ax.yaxis.set_tick_params(width=1.5, length=7)
+	plt.savefig("{}figures/{}_{}_{}iter.png".format(path, metric, suffix, n_iter), 
+				dpi=250, bbox_inches="tight")
+	if print_fig:
+		plt.show()
+	plt.close()
+
+
+

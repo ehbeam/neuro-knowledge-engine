@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import math
+import math, os, pickle
 import pandas as pd
 import numpy as np
 np.random.seed(42)
@@ -19,10 +19,49 @@ torch.manual_seed(42)
 import sys
 sys.path.append("..")
 import utilities
+from style import style
+from prediction.neural_network.sherlock.neural_network import Net
+
+
+def load_fit(clf, framework, direction, opt_epochs=500, train_epochs=1000, path=""):
+	if clf == "lr":
+		fit = pickle.load(open("{}logistic_regression/fits/{}_{}.p".format(path, framework, direction), "rb"))
+	if clf == "nn":
+		hyperparams = pd.read_csv("{}neural_network/data/params_{}_{}_{}epochs.csv".format(path, framework, direction, opt_epochs), 
+								  header=None, index_col=0)
+		h = {str(label): float(value) for label, value in hyperparams.iterrows()}
+		state_dict = torch.load("{}neural_network/fits/{}_{}_{}epochs.pt".format(path, framework, direction, train_epochs))
+		layers = list(state_dict.keys())
+		n_input = state_dict[layers[0]].shape[1]
+		n_output = state_dict[layers[-2]].shape[0]
+		fit = Net(n_input=n_input, n_output=n_output, 
+							 n_hid=int(h["n_hid"]), p_dropout=h["p_dropout"])
+		fit.load_state_dict(state_dict)
+	return fit
+
+
+def load_dataset(clf, scores, act, split, seed=42):
+	if clf == "lr":
+		X, Y = scores.loc[split].values, act.loc[split].values
+	if clf == "nn":
+		dataset = load_mini_batches(scores, act, split, mini_batch_size=len(split), seed=seed)[0]
+		dataset = numpy2torch(dataset)
+		X, Y = dataset
+	return X, Y
+
+
+def load_predictions(clf, fit, features):
+	if clf == "lr":
+		pred_probs = fit.predict_proba(features)
+	if clf == "nn":
+		with torch.no_grad():
+			pred_probs = fit.eval()(features).numpy()
+	preds = 1 * pred_probs > 0.5
+	return pred_probs, preds
 
 
 def plot_curves(metric, framework, direction, x, y, palette, 
-				diag=True, opacity=0.5, font=utilities.arial, path="", print_fig=True):
+				diag=True, opacity=0.5, font=style.font, path="", print_fig=True):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager, rcParams
@@ -63,7 +102,9 @@ def plot_curves(metric, framework, direction, x, y, palette,
 
 
 def compute_eval_metric(labels, preds, metric_function):
+	
 	import warnings
+	
 	metric_scores = []
 	for i in range(labels.shape[1]):
 		with warnings.catch_warnings(): # Ignore warning for classifiers that always predict 0
@@ -72,10 +113,94 @@ def compute_eval_metric(labels, preds, metric_function):
 	return metric_scores
 
 
+def compute_eval_stats(stats, framework, direction, features, labels, pred_probs, preds, splits, index,
+					   n_iter=1000, interval=0.999, metric_labels=["rocauc", "f1"], 
+					   clf2name={"lr": "logistic_regression", "nn": "neural_network"}, path="prediction/"):
+
+	from sklearn.metrics import roc_auc_score, f1_score
+	from statsmodels.stats.multitest import multipletests
+
+	stats["obs"][framework][direction] = {}
+	stats["obs"][framework][direction]["rocauc"] = compute_eval_metric(labels, pred_probs, roc_auc_score)
+	stats["obs"][framework][direction]["f1"] = compute_eval_metric(labels, preds, f1_score)
+
+	stats["boot"][framework][direction] = {}
+	stats["boot"][framework][direction]["rocauc"] = np.empty((len(stats["obs"][framework][direction]["rocauc"]), n_iter))
+	stats["boot"][framework][direction]["f1"] = np.empty((len(stats["obs"][framework][direction]["f1"]), n_iter))
+	
+	rocauc_file = "{}data/rocauc_boot_{}_{}_{}iter.csv".format(path, framework, direction, n_iter)
+	if os.path.isfile(rocauc_file):
+		stats["boot"][framework][direction]["rocauc"] = pd.read_csv(rocauc_file, index_col=0, header=0).values
+	else:
+		for n in range(n_iter):
+			samp = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=True)
+			stats["boot"][framework][direction]["rocauc"][:,n] = compute_eval_metric(labels[samp,:], pred_probs[samp,:], roc_auc_score)
+	
+	f1_file = "{}data/f1_boot_{}_{}_{}iter.csv".format(path, framework, direction, n_iter)
+	if os.path.isfile(f1_file):
+		stats["boot"][framework][direction]["f1"] = pd.read_csv(f1_file, index_col=0, header=0).values
+	else:
+		for n in range(n_iter):
+			samp = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=True)
+			stats["boot"][framework][direction]["f1"][:,n] = compute_eval_metric(labels[samp,:], preds[samp,:], f1_score)
+
+	stats["null"][framework][direction] = {}
+	stats["null"][framework][direction]["rocauc"] = np.empty((len(stats["obs"][framework][direction]["rocauc"]), n_iter))
+	stats["null"][framework][direction]["f1"] = np.empty((len(stats["obs"][framework][direction]["f1"]), n_iter))
+	
+	rocauc_file = "{}data/rocauc_null_{}_{}_{}iter.csv".format(path, framework, direction, n_iter)
+	if os.path.isfile(rocauc_file):
+		stats["null"][framework][direction]["rocauc"] = pd.read_csv(rocauc_file, index_col=0, header=0).values
+	else:
+		for n in range(n_iter):
+			shuf = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=False)
+			stats["null"][framework][direction]["rocauc"][:,n] = compute_eval_metric(labels[shuf,:], pred_probs, roc_auc_score)
+			if n % (n_iter/10) == 0:
+				print("\tProcessed {} iterations".format(n))
+	
+	f1_file = "{}data/f1_null_{}_{}_{}iter.csv".format(path, framework, direction, n_iter)
+	if os.path.isfile(f1_file):
+		stats["null"][framework][direction]["f1"] = pd.read_csv(f1_file, index_col=0, header=0).values
+	else:
+		for n in range(n_iter):
+			samp = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=True)
+			stats["null"][framework][direction]["f1"][:,n] = compute_eval_metric(labels[shuf,:], preds, f1_score)
+
+	idx_lower = int((1.0-interval)*n_iter)
+	idx_upper = int(interval*n_iter)
+	stats["null_ci"][direction] = {}
+	for metric in metric_labels:
+		dist = stats["null"][framework][direction][metric]
+		n_clf = dist.shape[0]
+		stats["null_ci"][direction][metric] = {}
+		stats["null_ci"][direction][metric]["lower"] = [sorted(dist[i,:])[idx_lower] for i in range(n_clf)]
+		stats["null_ci"][direction][metric]["upper"] = [sorted(dist[i,:])[idx_upper] for i in range(n_clf)]
+		stats["null_ci"][direction][metric]["mean"] = [np.mean(dist[i,:]) for i in range(n_clf)]
+
+	stats["p"][direction] = {}
+	for metric in metric_labels:
+		dist = stats["null"][framework][direction][metric]
+		n_clf = dist.shape[0]
+		stats["p"][direction][metric] = [np.sum(dist[i,:] >= stats["obs"][framework][direction][metric][i]) / float(n_iter) for i in range(n_clf)]
+
+	stats["fdr"][direction] = {}
+	for metric in metric_labels:
+		stats["fdr"][direction][metric] = multipletests(stats["p"][direction][metric], method="fdr_bh")[1]
+
+	for metric in metric_labels:
+		for dist, dic in zip(["boot", "null"], [stats["boot"], stats["null"]]):
+			df = pd.DataFrame(dic[framework][direction][metric], index=index[direction], columns=range(n_iter))
+			df.to_csv("{}data/{}_{}_{}_{}_{}iter.csv".format(path, metric, dist, framework, direction, n_iter))
+		obs_df = pd.DataFrame(stats["obs"][framework][direction][metric], index=index[direction])
+		obs_df.to_csv("{}data/{}_obs_{}_{}.csv".format(path, metric, framework, direction), header=None)
+
+	return stats
+
+
 def plot_eval_metric(metric, framework, direction, obs, boot, null_ci, fdr, 
 					 palette, labels=[], dx=0.375, dxs=0.1, figsize=(11,4.5), 
 					 ylim=[0.43,0.78], yticks=np.array(range(0,100,5))/100,
-					 alpha=0.001, font=utilities.arial, print_fig=True, path=""):
+					 alphas=[0.05,0.01,0.001], font=style.font, print_fig=True, path=""):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager, rcParams
@@ -109,8 +234,9 @@ def plot_eval_metric(metric, framework, direction, obs, boot, null_ci, fdr,
 			v[line].set_edgecolor("none")
 
 		# Comparison test
-		if fdr[i] < alpha:
-			plt.text(i-dxs, max(boot[i,:]), "*", fontproperties=font_lg)
+		for alpha, y in zip(alphas, [0, 0.015, 0.03]):
+			if fdr[i] < alpha:
+				plt.text(i-dxs, max(boot[i,:])+y, "*", fontproperties=font_lg)
 
 	ax.set_xticks(range(n_clf))
 	ax.set_xticklabels(labels, rotation=60, ha="right")
@@ -166,22 +292,24 @@ def plot_loss(prefix, loss, xlab="", ylab="",
 
 
 def compute_roc(labels, pred_probs):
+
 	from sklearn.metrics import roc_curve
+
 	fpr, tpr = [], []
 	for i in range(labels.shape[1]):
-		fpr_i, tpr_i, _ = roc_curve(labels[:,i], 
-									pred_probs[:,i], pos_label=1)
+		fpr_i, tpr_i, _ = roc_curve(labels[:,i], pred_probs[:,i], pos_label=1)
 		fpr.append(fpr_i)
 		tpr.append(tpr_i)
 	return fpr, tpr
 
 
 def compute_prc(labels, pred_probs):
+
 	from sklearn.metrics import precision_recall_curve
+
 	precision, recall = [], []
 	for i in range(labels.shape[1]):
-		p_i, r_i, _ = precision_recall_curve(labels[:,i], 
-											 pred_probs[:,i], pos_label=1)
+		p_i, r_i, _ = precision_recall_curve(labels[:,i], pred_probs[:,i], pos_label=1)
 		precision.append(p_i)
 		recall.append(r_i)
 	return precision, recall
@@ -234,52 +362,27 @@ def reset_weights(m):
 		m.reset_parameters()
 
 
-class Net(nn.Module):
-	def __init__(self, n_input=0, n_output=0, n_hid=100, p_dropout=0.5):
-		super(Net, self).__init__()
-		self.fc1 = nn.Linear(n_input, n_hid)
-		self.bn1 = nn.BatchNorm1d(n_hid)
-		self.dropout1 = nn.Dropout(p=p_dropout)
-		self.fc2 = nn.Linear(n_hid, n_hid)
-		self.bn2 = nn.BatchNorm1d(n_hid)
-		self.dropout2 = nn.Dropout(p=p_dropout)
-		self.fc3 = nn.Linear(n_hid, n_hid)
-		self.bn3 = nn.BatchNorm1d(n_hid)
-		self.dropout3 = nn.Dropout(p=p_dropout)
-		self.fc4 = nn.Linear(n_hid, n_hid)
-		self.bn4 = nn.BatchNorm1d(n_hid)
-		self.dropout4 = nn.Dropout(p=p_dropout)
-		self.fc5 = nn.Linear(n_hid, n_hid)
-		self.bn5 = nn.BatchNorm1d(n_hid)
-		self.dropout5 = nn.Dropout(p=p_dropout)
-		self.fc6 = nn.Linear(n_hid, n_hid)
-		self.bn6 = nn.BatchNorm1d(n_hid)
-		self.dropout6 = nn.Dropout(p=p_dropout)
-		self.fc7 = nn.Linear(n_hid, n_hid)
-		self.bn7 = nn.BatchNorm1d(n_hid)
-		self.dropout7 = nn.Dropout(p=p_dropout)
-		self.fc8 = nn.Linear(n_hid, n_output)
-		
-		# Xavier initialization for weights
-		for fc in [self.fc1, self.fc2, self.fc3, self.fc4,
-				   self.fc5, self.fc6, self.fc7, self.fc8]:
-			nn.init.xavier_uniform_(fc.weight)
+def compare_frameworks(stats, frameworks, directions, metric_labels, n_iter=1000):
 
-	def forward(self, x):
-		x = self.dropout1(F.relu(self.bn1(self.fc1(x))))
-		x = self.dropout2(F.relu(self.bn2(self.fc2(x))))
-		x = self.dropout3(F.relu(self.bn3(self.fc3(x))))
-		x = self.dropout4(F.relu(self.bn4(self.fc4(x))))
-		x = self.dropout5(F.relu(self.bn5(self.fc5(x))))
-		x = self.dropout6(F.relu(self.bn6(self.fc6(x))))
-		x = self.dropout7(F.relu(self.bn7(self.fc7(x))))
-		x = torch.sigmoid(self.fc8(x))
-		return x
+	from statsmodels.stats.multitest import multipletests
+
+	fdr = {}
+	for metric in metric_labels:
+		fdr[metric] = {}
+		for direction in directions:
+			p = np.empty((len(frameworks), len(frameworks)))
+			for i, fw_i in enumerate(frameworks):
+				for j, fw_j in enumerate(frameworks):
+					boot_i = np.mean(stats["boot"][fw_i][direction][metric], axis=0)
+					boot_j = np.mean(stats["boot"][fw_j][direction][metric], axis=0)
+					p[i,j] = np.sum((boot_i - boot_j) <= 0.0) / float(n_iter)
+			fdr_md = multipletests(p.ravel(), method="fdr_bh")[1].reshape(p.shape)
+			fdr[metric][direction] = pd.DataFrame(fdr_md, index=frameworks, columns=frameworks)
+	return fdr
 
 
-def plot_framework_comparison(metric, direction, boot, n_iter=1000, font=utilities.arial,
+def plot_framework_comparison(metric, direction, boot, n_iter=1000, font=style.font,
 							  dx=0.38, ylim=[0.4,0.65], yticks=[], path="", print_fig=True):
-	
 
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager, rcParams
@@ -291,9 +394,8 @@ def plot_framework_comparison(metric, direction, boot, n_iter=1000, font=utiliti
 	ax = fig.add_axes([0,0,1,1])
 
 	i = 0
-	labels = []
+	labels = ["Data-Driven", "RDoC", "DSM"]
 	for fw, dist in boot.items():
-		labels.append(dist["name"])
 		dist = dist[direction][metric]
 		dist_avg = np.mean(dist, axis=0)
 		macro_avg = np.mean(dist_avg)
@@ -326,3 +428,20 @@ def plot_framework_comparison(metric, direction, boot, n_iter=1000, font=utiliti
 		plt.show()
 	plt.close()
 
+
+def map_framework_comparison(stats, metric_labels, n_iter=1000, alpha=0.001):
+
+	from statsmodels.stats.multitest import multipletests
+
+	dif_thres = {}
+	for framework in ["rdoc", "dsm"]:
+		dif_thres[framework] = {}
+		for metric in metric_labels:
+			dif_null = stats["null"]["data-driven"]["forward"][metric] - stats["null"][framework]["forward"][metric]
+			dif_obs = np.array(stats["obs"]["data-driven"]["forward"][metric]) - np.array(stats["obs"][framework]["forward"][metric])
+			pvals = [np.sum(np.abs(dif_null[i,:]) > np.abs(dif_obs[i])) / n_iter for i in range(len(dif_obs))]
+			fdrs = multipletests(pvals, method="fdr_bh")[1]
+			dif_obs[fdrs >= alpha] = np.nan
+			dif_thres[framework][metric] = pd.DataFrame(dif_obs)
+			dif_thres[framework][metric].columns = [""]
+	return dif_thres

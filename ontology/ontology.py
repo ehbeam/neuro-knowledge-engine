@@ -13,11 +13,13 @@ torch.manual_seed(42)
 
 import sys
 sys.path.append("..")
-from utilities import *
+import utilities
+from style import style
+from prediction.neural_network.sherlock.neural_network import Net
 
 from matplotlib import font_manager, rcParams
-font_md = font_manager.FontProperties(fname=arial, size=20)
-font_lg = font_manager.FontProperties(fname=arial, size=22)
+font_md = font_manager.FontProperties(fname=style.font, size=20)
+font_lg = font_manager.FontProperties(fname=style.font, size=22)
 rcParams["axes.linewidth"] = 1.5
 
 from scipy.spatial.distance import cdist
@@ -69,21 +71,70 @@ def cluster_structures(k, stm, structures):
 	return clust
 
 
-def assign_functions(clust, splits, act_bin, dtm_bin, list_lens=range(5,26)):
+def assign_functions(k, clust, splits, act, dtm, lexicon, list_lens=range(5,26)):
 
 	from scipy.stats import pointbiserialr
 
 	lists = pd.DataFrame()
 	for i in range(k):
 		structures = list(clust.loc[clust["CLUSTER"] == i+1, "STRUCTURE"])
-		centroid = np.mean(act_bin.loc[splits["train"], structures], axis=1)
-		R = pd.Series([pointbiserialr(dtm_bin.loc[splits["train"], word], centroid)[0] 
+		centroid = np.mean(act.loc[splits["train"], structures], axis=1)
+		R = pd.Series([pointbiserialr(dtm.loc[splits["train"], word], centroid)[0] 
 					   for word in lexicon], index=lexicon)
 		R = R[R > 0].sort_values(ascending=False)[:max(list_lens)]
 		R = pd.DataFrame({"CLUSTER": [i+1 for l in range(max(list_lens))], 
 						  "TOKEN": R.index, "R": R.values})
 		lists = lists.append(R)
 	return lists
+
+
+def load_fits(clf, directions, n_circuits, path=""):
+
+	import pickle, torch
+
+	fits = {}
+	for direction in directions:
+		fits[direction] = {}
+		for k in n_circuits:
+			if clf == "lr":
+				fit_file = "{}logistic_regression/sherlock/fits/{}_k{:02d}_{}.p".format(path, direction, k, direction)
+				fits[direction][k] = pickle.load(open(fit_file, "rb"))
+			if clf == "nn":
+				state_dict = torch.load("{}neural_network/sherlock/fits/{}_k{:02d}.pt".format(path, direction, k))
+				hyperparams = pd.read_csv("{}neural_network/data/params_data-driven_k{:02d}_{}.csv".format(path, k, direction), 
+										  header=None, index_col=0)
+				h = {str(label): float(value) for label, value in hyperparams.iterrows()}
+				layers = list(state_dict.keys())
+				n_input = state_dict[layers[0]].shape[1]
+				n_output = state_dict[layers[-2]].shape[0]
+				fits[direction][k] = Net(n_input=n_input, n_output=n_output, 
+								 		 n_hid=int(h["n_hid"]), p_dropout=h["p_dropout"])
+				fits[direction][k].load_state_dict(state_dict)
+	return fits
+
+
+def load_domain_features(dtm, act, directions, n_circuits, suffix="", path=""):
+
+	from sklearn.preprocessing import binarize
+
+	features = {k: {} for k in n_circuits}
+	for k in n_circuits:
+		domains = range(1, k+1)
+		lists, circuits = load_ontology(k, suffix=suffix, path=path)
+		function_features = pd.DataFrame(index=dtm.index, columns=domains)
+		structure_features = pd.DataFrame(index=act.index, columns=domains)
+		for i in domains:
+			functions = lists.loc[lists["CLUSTER"] == i, "TOKEN"]
+			function_features[i] = dtm[functions].sum(axis=1)
+			structures = circuits.loc[circuits["CLUSTER"] == i, "STRUCTURE"]
+			structure_features[i] = act[structures].sum(axis=1)
+		function_features = pd.DataFrame(utilities.doc_mean_thres(function_features), 
+										 index=dtm.index, columns=domains)
+		structure_features = pd.DataFrame(binarize(structure_features), 
+										 index=act.index, columns=domains)
+		features[k]["function"] = function_features
+		features[k]["structure"] = structure_features
+	return features
 
 
 def compute_cooccurrences(activations, scores):
@@ -110,49 +161,6 @@ def compute_cooccurrences_null(activations, scores, n_iter=1000, verbose=False):
 			if n % (n_iter/10) == 0:
 				print("Iteration {}".format(n))
 	return X_null
-
-
-class Net(nn.Module):
-  def __init__(self, n_input=0, n_output=0, n_hid=100, p_dropout=0.5):
-    super(Net, self).__init__()
-    self.fc1 = nn.Linear(n_input, n_hid)
-    self.bn1 = nn.BatchNorm1d(n_hid)
-    self.dropout1 = nn.Dropout(p=p_dropout)
-    self.fc2 = nn.Linear(n_hid, n_hid)
-    self.bn2 = nn.BatchNorm1d(n_hid)
-    self.dropout2 = nn.Dropout(p=p_dropout)
-    self.fc3 = nn.Linear(n_hid, n_hid)
-    self.bn3 = nn.BatchNorm1d(n_hid)
-    self.dropout3 = nn.Dropout(p=p_dropout)
-    self.fc4 = nn.Linear(n_hid, n_hid)
-    self.bn4 = nn.BatchNorm1d(n_hid)
-    self.dropout4 = nn.Dropout(p=p_dropout)
-    self.fc5 = nn.Linear(n_hid, n_hid)
-    self.bn5 = nn.BatchNorm1d(n_hid)
-    self.dropout5 = nn.Dropout(p=p_dropout)
-    self.fc6 = nn.Linear(n_hid, n_hid)
-    self.bn6 = nn.BatchNorm1d(n_hid)
-    self.dropout6 = nn.Dropout(p=p_dropout)
-    self.fc7 = nn.Linear(n_hid, n_hid)
-    self.bn7 = nn.BatchNorm1d(n_hid)
-    self.dropout7 = nn.Dropout(p=p_dropout)
-    self.fc8 = nn.Linear(n_hid, n_output)
-    
-    # Xavier initialization for weights
-    for fc in [self.fc1, self.fc2, self.fc3, self.fc4,
-           self.fc5, self.fc6, self.fc7, self.fc8]:
-      nn.init.xavier_uniform_(fc.weight)
-
-  def forward(self, x):
-    x = self.dropout1(F.relu(self.bn1(self.fc1(x))))
-    x = self.dropout2(F.relu(self.bn2(self.fc2(x))))
-    x = self.dropout3(F.relu(self.bn3(self.fc3(x))))
-    x = self.dropout4(F.relu(self.bn4(self.fc4(x))))
-    x = self.dropout5(F.relu(self.bn5(self.fc5(x))))
-    x = self.dropout6(F.relu(self.bn6(self.fc6(x))))
-    x = self.dropout7(F.relu(self.bn7(self.fc7(x))))
-    x = torch.sigmoid(self.fc8(x))
-    return x
  
 
 def numpy2torch(data):
@@ -197,25 +205,28 @@ def load_mini_batches(X, Y, split, mini_batch_size=64, seed=0, reshape_labels=Fa
 	return mini_batches
 
 
-def compute_eval_scores(scoring_function, directions, circuit_counts, features, fits, ids):
-	
-	eval_scores = {direction: np.zeros((len(circuit_counts))) for direction in directions}
-	
-	for i, k in enumerate(circuit_counts):
-		
-		with torch.no_grad():
-			data_set = load_mini_batches(features[k]["function"].loc[ids], features[k]["structure"].loc[ids], 
-										ids, mini_batch_size=len(ids), seed=42)
-			function_features, structure_features = numpy2torch(data_set[0])
-			y_pred_for = fits["forward"][k].eval()(function_features).float()
-			y_true_for = structure_features
-			y_pred_rev = fits["reverse"][k].eval()(structure_features).float()
-			y_true_rev = function_features
+def compute_eval_scores(clf, scoring_function, directions, n_circuits, features, fits, ids):
 
-		score_for = scoring_function(y_true_for, y_pred_for, average="macro")
-		eval_scores["forward"][i] = score_for
-		score_rev = scoring_function(y_true_rev, y_pred_rev, average="macro")
-		eval_scores["reverse"][i] = score_rev
+	eval_scores = {direction: np.zeros((len(n_circuits))) for direction in directions}
+	
+	for i, k in enumerate(n_circuits):
+		
+		if clf == "lr":
+			function_features = features[k]["function"].loc[ids] 
+			structure_features = features[k]["structure"].loc[ids]
+			y_pred_for = fits["forward"][k].predict_proba(function_features)
+			y_pred_rev = fits["reverse"][k].predict_proba(structure_features)
+
+		if clf == "nn":
+			with torch.no_grad():
+				data_set = load_mini_batches(features[k]["function"].loc[ids], features[k]["structure"].loc[ids], 
+											 ids, mini_batch_size=len(ids), seed=42)
+				function_features, structure_features = numpy2torch(data_set[0])
+				y_pred_for = fits["forward"][k].eval()(function_features).float()
+				y_pred_rev = fits["reverse"][k].eval()(structure_features).float()
+
+		eval_scores["forward"][i] = scoring_function(structure_features, y_pred_for, average="macro")
+		eval_scores["reverse"][i] = scoring_function(function_features, y_pred_rev, average="macro")
 
 	eval_scores["mean"] = np.mean([eval_scores["forward"], eval_scores["reverse"]], axis=0)
 	return eval_scores
@@ -229,24 +240,30 @@ def load_eval_data(features, k, ids):
 	return function_features, structure_features
 
 
-def load_eval_preds(clf, features):
-	with torch.no_grad():
-		preds = clf.eval()(features).float()
+def load_eval_preds(clf, fit, features):
+	
+	if clf == "lr":
+		preds = fit.predict_proba(features)
+
+	if clf == "nn":
+		with torch.no_grad():
+			preds = fit.eval()(features).float()
+
 	return preds
 
 
-def compute_eval_boot(scoring_function, directions, circuit_counts, 
+def compute_eval_boot(clf, scoring_function, directions, n_circuits, 
 					  features, fits, ids, n_iter=1000, verbose=True, path=""):
-	eval_boot = {direction: np.zeros((len(circuit_counts), n_iter)) for direction in directions}
+	eval_boot = {direction: np.zeros((len(n_circuits), n_iter)) for direction in directions}
 
-	file_for = "{}data/circuits_forward_boot_{}iter.csv".format(path, n_iter)
+	file_for = "{}data/circuits_{}_forward_boot_{}iter.csv".format(path, clf, n_iter)
 	if not os.path.exists(file_for):
 		print("Bootstrap for N Domains | Forward")
-		for i, k in enumerate(circuit_counts):
+		for i, k in enumerate(n_circuits):
 			if i % 10 == 0 and verbose:
 				print("   Processing {}th k".format(i))
 			function_features, structure_features = load_eval_data(features, k, ids)
-			y_pred_for = load_eval_preds(fits["forward"][k], function_features)
+			y_pred_for = load_eval_preds(clf, fits["forward"][k], function_features)
 			y_true_for = structure_features
 			for n in range(n_iter):
 				boot = np.random.choice(range(len(ids)), size=len(ids), replace=True)
@@ -256,15 +273,15 @@ def compute_eval_boot(scoring_function, directions, circuit_counts,
 	elif os.path.exists(file_for):
 		eval_boot["forward"] = pd.read_csv(file_for, index_col=0, header=0).values
 
-	file_rev = "{}data/circuits_reverse_boot_{}iter.csv".format(path, n_iter)
+	file_rev = "{}data/circuits_{}_reverse_boot_{}iter.csv".format(path, clf, n_iter)
 	if not os.path.exists(file_rev):
 		print("Bootstrap for N Domains | Reverse")
-		for i, k in enumerate(circuit_counts):
+		for i, k in enumerate(n_circuits):
 			if i % 10 == 0 and verbose:
 				print("   Processing {}th k".format(i))
 			with torch.no_grad():
 				function_features, structure_features = load_eval_data(features, k, ids)
-				y_pred_rev = load_eval_preds(fits["reverse"][k], structure_features)
+				y_pred_rev = load_eval_preds(clf, fits["reverse"][k], structure_features)
 				y_true_rev = function_features
 			for n in range(n_iter):
 				boot = np.random.choice(range(len(ids)), size=len(ids), replace=True)
@@ -279,19 +296,19 @@ def compute_eval_boot(scoring_function, directions, circuit_counts,
 	return eval_boot
 
 
-def compute_eval_null(scoring_function, directions, circuit_counts,
+def compute_eval_null(clf, scoring_function, directions, n_circuits,
 					  features, fits, ids, n_iter=1000, verbose=True, path=""):
-	eval_null = {direction: np.zeros((len(circuit_counts), n_iter)) for direction in directions}
+	eval_null = {direction: np.zeros((len(n_circuits), n_iter)) for direction in directions}
 	
-	file_for = "{}data/circuits_forward_null_{}iter.csv".format(path, n_iter)
+	file_for = "{}data/circuits_{}_forward_null_{}iter.csv".format(path, clf, n_iter)
 	if not os.path.exists(file_for):
 		print("Permutation for N Domains | Forward")
-		for i, k in enumerate(circuit_counts):
+		for i, k in enumerate(n_circuits):
 			if i % 10 == 0 and verbose:
 				print("   Processing {}th k".format(i))
 			with torch.no_grad():
 				function_features, structure_features = load_eval_data(features, k, ids)
-				y_pred_for = load_eval_preds(fits["forward"][k], function_features)
+				y_pred_for = load_eval_preds(clf, fits["forward"][k], function_features)
 				y_true_for = structure_features
 			for n in range(n_iter):
 				null = np.random.choice(range(len(ids)), size=len(ids), replace=False)
@@ -301,15 +318,15 @@ def compute_eval_null(scoring_function, directions, circuit_counts,
 	elif os.path.exists(file_for):
 		eval_null["forward"] = pd.read_csv(file_for, index_col=0, header=0).values
 
-	file_rev = "{}data/circuits_reverse_null_{}iter.csv".format(path, n_iter)
+	file_rev = "{}data/circuits_{}_reverse_null_{}iter.csv".format(path, clf, n_iter)
 	if not os.path.exists(file_rev):
 		print("Permutation for N Domains | Reverse")
-		for i, k in enumerate(circuit_counts):
+		for i, k in enumerate(n_circuits):
 			if i % 10 == 0 and verbose:
 				print("   Processing {}th k".format(i))
 			with torch.no_grad():
 				function_features, structure_features = load_eval_data(features, k, ids)
-				y_pred_rev = load_eval_preds(fits["reverse"][k], structure_features)
+				y_pred_rev = load_eval_preds(clf, fits["reverse"][k], structure_features)
 				y_true_rev = function_features
 			for n in range(n_iter):
 				null = np.random.choice(range(len(ids)), size=len(ids), replace=False)
@@ -317,15 +334,16 @@ def compute_eval_null(scoring_function, directions, circuit_counts,
 				eval_null["reverse"][i,n] = score_rev
 		pd.DataFrame(eval_null["reverse"]).to_csv(file_rev)
 		print("")
-	elif os.path.exists(file_for):
-		eval_null["reverse"] = pd.read_csv(file_for, index_col=0, header=0).values
+	elif os.path.exists(file_rev):
+		eval_null["reverse"] = pd.read_csv(file_rev, index_col=0, header=0).values
 
 	eval_null["mean"] = np.mean([eval_null["forward"], eval_null["reverse"]], axis=0)
 	return eval_null
 
 
-def plot_scores(scores, direction, circuit_counts, boot, null, label, shape="o", op_k=6, 
-				ylim=[0,1], yticks=[], interval=0.999, font=arial, path="", print_fig=True):
+def plot_scores(direction, n_circuits, stats, shape="o", op_k=6, interval=0.999, 
+				ylim=[0.45,0.7], yticks=np.arange(0.4,0.75,0.05), 
+				font=style.font, clf="lr", path="", print_fig=True):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager, rcParams
@@ -334,36 +352,36 @@ def plot_scores(scores, direction, circuit_counts, boot, null, label, shape="o",
 	ax = fig.add_axes([0,0,1,1])
 	font_prop = font_manager.FontProperties(fname=font, size=20)
 
-	# Plot distribution
-	null_lower, null_upper = load_confidence_interval(null, direction, circuit_counts, interval=interval)
-	plt.fill_between(circuit_counts, null_lower, null_upper, 
+	# Plot null distribution
+	null_lower, null_upper = load_confidence_interval(stats["null"], direction, n_circuits, interval=interval)
+	plt.fill_between(n_circuits, null_lower, null_upper, 
 					 alpha=0.2, color="gray")
-	plt.plot(circuit_counts, np.mean(null[direction][:len(circuit_counts)], axis=1), 
+	plt.plot(n_circuits, np.mean(stats["null"][direction][:len(n_circuits)], axis=1), 
 			 linestyle="dashed", c="k", alpha=1, linewidth=2)
 
 	# Plot bootstrap distribution
-	n_iter = float(boot[direction].shape[1])
-	boot_lower, boot_upper = load_confidence_interval(boot, direction, circuit_counts, interval=interval)
-	for j, k in enumerate(circuit_counts):
+	n_iter = float(stats["boot"][direction].shape[1])
+	boot_lower, boot_upper = load_confidence_interval(stats["boot"], direction, n_circuits, interval=interval)
+	for j, k in enumerate(n_circuits):
 		plt.plot([k, k], [boot_lower[j], boot_upper[j]], c="k", 
 				 linewidth=9, alpha=0.15)
 
 	# Plot observed values
-	plt.scatter(circuit_counts, scores[direction][:len(circuit_counts)], color="black", 
+	plt.scatter(n_circuits, stats["scores"][direction][:len(n_circuits)], color="black", 
 				marker=shape, zorder=1000, s=45, alpha=0.3)
-	xp = np.linspace(circuit_counts[0], circuit_counts[-1], 100)
-	idx = np.isfinite(scores[direction][:len(circuit_counts)])
-	p = np.poly1d(np.polyfit(np.array(circuit_counts)[idx], scores[direction][:len(circuit_counts)][idx], 2))
+	xp = np.linspace(n_circuits[0], n_circuits[-1], 100)
+	idx = np.isfinite(stats["scores"][direction][:len(n_circuits)])
+	p = np.poly1d(np.polyfit(np.array(n_circuits)[idx], stats["scores"][direction][:len(n_circuits)][idx], 2))
 	plt.plot(xp, p(xp), zorder=0, linewidth=2, 
 			 color="black", alpha=1)
 
 	# Plot selected value
-	op_idx = list(circuit_counts).index(op_k)
-	plt.scatter(circuit_counts[op_idx]+0.03, scores[direction][:len(circuit_counts)][op_idx]-0.00015, 
+	op_idx = list(n_circuits).index(op_k)
+	plt.scatter(n_circuits[op_idx]+0.03, stats["scores"][direction][:len(n_circuits)][op_idx]-0.00015, 
 				linewidth=2.5, edgecolor="black", color="none", 
 				marker=shape, s=70, zorder=100)
 
-	plt.xlim([0,max(circuit_counts)+1])
+	plt.xlim([0,max(n_circuits)+1])
 	plt.ylim(ylim)
 	plt.xticks(fontproperties=font_prop)
 	plt.yticks(yticks,fontproperties=font_prop)
@@ -372,18 +390,18 @@ def plot_scores(scores, direction, circuit_counts, boot, null, label, shape="o",
 	for side in ["right", "top"]:
 		ax.spines[side].set_visible(False)
 
-	n_iter = boot[direction].shape[1]
-	plt.savefig("{}figures/data-driven_{}_{}_{}iter.png".format(path, label, direction, n_iter), 
+	n_iter = stats["boot"][direction].shape[1]
+	plt.savefig("{}figures/data-driven_{}_rocauc_{}_{}iter.png".format(path, clf, direction, n_iter), 
 				dpi=250, bbox_inches="tight")
 	if print_fig:
 	   plt.show()
 	plt.close()
 
 
-def load_confidence_interval(distribution, direction, circuit_counts, interval=0.999):
+def load_confidence_interval(distribution, direction, n_circuits, interval=0.999):
 	n_iter = float(distribution[direction].shape[1])
-	lower = [sorted(distribution[direction][k,:])[int(n_iter*(1.0-interval))] for k in range(len(circuit_counts))]
-	upper = [sorted(distribution[direction][k,:])[int(n_iter*interval)] for k in range(len(circuit_counts))]
+	lower = [sorted(distribution[direction][k,:])[int(n_iter*(1.0-interval))] for k in range(len(n_circuits))]
+	upper = [sorted(distribution[direction][k,:])[int(n_iter*interval)] for k in range(len(n_circuits))]
 	return lower, upper
 
 
@@ -401,8 +419,35 @@ def term_degree_centrality(i, lists, circuits, dtm, ids, reweight=False):
 	return degrees
 
 
+def export_ontology(lists, circuits, n_domains, ord_domains, clf, act, k2name, path=""):
+
+	names = [k2name[k] for k in ord_domains]
+	k2order = {k: ord_domains.index(k)+1 for k in range(1, n_domains+1)}
+
+	lists["ORDER"] = [k2order[k] for k in lists["CLUSTER"]]
+	lists["DOMAIN"] = [k2name[k] for k in lists["CLUSTER"]]
+	lists = lists.sort_values(["ORDER", "R"], ascending=[True, False])
+	lists = lists[["ORDER", "CLUSTER", "DOMAIN", "TOKEN", "R", "ROC_AUC"]]
+	lists.to_csv("{}lists/lists_data-driven_{}.csv".format(path, clf), index=None)
+
+	circuits["ORDER"] = [k2order[k] for k in circuits["CLUSTER"]]
+	circuits["DOMAIN"] = [k2name[k] for k in circuits["CLUSTER"]]
+	circuits = circuits.sort_values(["ORDER", "STRUCTURE"])
+	circuits = circuits[["ORDER", "CLUSTER", "DOMAIN", "STRUCTURE"]]
+	circuits.to_csv("{}circuits/clusters_data-driven_{}.csv".format(path, clf), index=None)
+
+	circuit_mat = pd.DataFrame(0.0, index=act.columns, columns=names)
+	for name in names:
+		structures = circuits.loc[circuits["DOMAIN"] == name, "STRUCTURE"]
+		for structure in structures:
+			circuit_mat.loc[structure, name] = 1.0
+	circuit_mat.to_csv("{}circuits/circuits_data-driven_{}.csv".format(path, clf))
+
+	return lists, circuit_mat
+
+
 def plot_wordclouds(framework, domains, lists, dtm, path="", 
-					font_path=arial, print_fig=True, width=550):
+					font=style.font, print_fig=True, width=550):
 	
 	from wordcloud import WordCloud
 	import matplotlib.pyplot as plt
@@ -411,7 +456,7 @@ def plot_wordclouds(framework, domains, lists, dtm, path="",
 		
 		def color_func(word, font_size, position, orientation, 
 					   random_state=None, idx=0, **kwargs):
-			return palettes[framework][i]
+			return style.palettes[framework][i]
 
 		tkns = lists.loc[lists["DOMAIN"] == dom, "TOKEN"]
 		freq = dtm[tkns].sum().values
@@ -419,7 +464,7 @@ def plot_wordclouds(framework, domains, lists, dtm, path="",
 
 		cloud = WordCloud(background_color="rgba(255, 255, 255, 0)", mode="RGB", 
 						  max_font_size=100, prefer_horizontal=1, scale=20, margin=3,
-						  width=width, height=15*len(tkns)+550, font_path=arial, 
+						  width=width, height=15*len(tkns)+550, font_path=font, 
 						  random_state=42).generate_from_frequencies(zip(tkns, freq))
 
 		fig = plt.figure()
@@ -428,22 +473,24 @@ def plot_wordclouds(framework, domains, lists, dtm, path="",
 		file_name = "{}figures/lists/{}_wordcloud_{}.png".format(path, framework, dom)
 		plt.savefig(file_name, 
 					dpi=800, bbox_inches="tight")
-		transparent_background(file_name)
+		utilities.transparent_background(file_name)
 		if print_fig:
 			print(dom)
 			plt.show()
 		plt.close()
 
 
-def load_rdoc_lists(lexicon, vsm, seed_df, n_thres=25, verbose=False):
+def load_rdoc_lists(lexicon, vsm, seeds, dtm, n_terms=range(5,26), path="", verbose=False):
 	
 	from collections import OrderedDict
 	from scipy.spatial.distance import cdist
 
+	n_thres = max(list(n_terms))
+
 	lists = pd.DataFrame()
-	labels = list(OrderedDict.fromkeys(seed_df["DOMAIN"]))
-	for l, label in enumerate(labels):
-		dom_df = seed_df.loc[seed_df["DOMAIN"] == label]
+	doms = list(OrderedDict.fromkeys(seeds["DOMAIN"]))
+	for l, dom in enumerate(doms):
+		dom_df = seeds.loc[seeds["DOMAIN"] == dom]
 		tokens = list(dom_df["TOKEN"])
 		centroid = np.mean(vsm.loc[tokens]).values.reshape(1, -1)
 		dists = cdist(vsm.loc[lexicon], centroid, metric="cosine")
@@ -452,13 +499,13 @@ def load_rdoc_lists(lexicon, vsm, seed_df, n_thres=25, verbose=False):
 		
 		if verbose:
 			if len(dists) == 0:
-				print("No tokens assigned to {}".format(label))
+				print("No tokens assigned to {}".format(dom))
 			if len(dists) < n_thres:
-				print("{} tokens assigned to {}".format(len(dists), label))
+				print("{} tokens assigned to {}".format(len(dists), dom))
 		
 		for w, d in dists:
 			dic = {"ORDER": [l],
-				   "DOMAIN": [label],
+				   "DOMAIN": [dom],
 				   "TOKEN": [w],
 				   "SOURCE": ["RDoC" if w in tokens else "Lexicon"],
 				   "DISTANCE": [d]}
@@ -466,14 +513,31 @@ def load_rdoc_lists(lexicon, vsm, seed_df, n_thres=25, verbose=False):
 	
 	lists = lists[["ORDER", "DOMAIN", "TOKEN", "SOURCE", "DISTANCE"]]
 	lists = lists.sort_values(["ORDER", "DISTANCE"])
+	lists = lists.loc[lists["TOKEN"].isin(dtm.columns)]
+	lists.to_csv("{}lists/lists_rdoc.csv".format(path), index=None)
+	op_df = load_optimized_lists(doms, lists, n_terms, seeds, vsm)
+	op_df.to_csv("{}data/df_rdoc_opsim.csv".format(path))
+	lists = update_lists(doms, op_df, lists, "rdoc", path=path)
+
 	return lists
 
 
-def load_dsm_lists(lexicon, vsm, seed_df, unique, n_thres=25, verbose=False):
+def load_dsm_lists(lexicon, vsm, seeds, n_terms=range(5, 26), path="", verbose=False):
 	
+	from collections import OrderedDict
+	from scipy.spatial.distance import cdist
+
+	n_thres = max(list(n_terms))
+
+	doms = list(OrderedDict.fromkeys(seeds["DOMAIN"]))
+	tokens = []
+	for dom in doms:
+		tokens += list(set(seeds.loc[seeds["DOMAIN"] == dom, "TOKEN"]))
+	unique = [tkn for tkn in tokens if tokens.count(tkn) == 1]
+
 	lists = pd.DataFrame()
-	for label in set(seed_df["DOMAIN"]):
-		dom_df = seed_df.loc[seed_df["DOMAIN"] == label]
+	for dom in doms:
+		dom_df = seeds.loc[seeds["DOMAIN"] == dom]
 		tokens = set(dom_df["TOKEN"]).intersection(vsm.index)
 		required = tokens.intersection(unique)
 		forbidden = set(unique).difference(tokens)
@@ -486,11 +550,11 @@ def load_dsm_lists(lexicon, vsm, seed_df, unique, n_thres=25, verbose=False):
 		
 		if verbose:
 			if len(dists) == 0:
-				print("No tokens assigned to {}".format(label))
+				print("No tokens assigned to {}".format(dom))
 		
 		for w, d in dists:
 			dic = {"ORDER": [list(dom_df["ORDER"])[0] + 1],
-				   "DOMAIN": [label],
+				   "DOMAIN": [dom],
 				   "TOKEN": [w],
 				   "SOURCE": ["DSM" if w in tokens else "Lexicon"],
 				   "DISTANCE": [d]}
@@ -498,6 +562,12 @@ def load_dsm_lists(lexicon, vsm, seed_df, unique, n_thres=25, verbose=False):
 	
 	lists = lists[["ORDER", "DOMAIN", "TOKEN", "SOURCE", "DISTANCE"]]
 	lists = lists.sort_values(["ORDER", "DISTANCE"])
+	lists.to_csv("{}lists/lists_dsm.csv".format(path), index=None)
+
+	op_df = load_optimized_lists(doms, lists, n_terms, seeds, vsm)
+	op_df.to_csv("{}data/df_dsm_opsim.csv".format(path))
+	lists = update_lists(doms, op_df, lists, "dsm", path=path)
+
 	return lists
 
 
@@ -522,15 +592,16 @@ def load_optimized_lists(doms, lists, list_lens, seed_df, vsm):
 	return op_df
 
 
-def update_lists(doms, op_df, lists, framework):
+def update_lists(doms, op_df, lists, framework, path=""):
 	columns = ["ORDER", "DOMAIN", "TOKEN", "SOURCE", "DISTANCE"]
 	new = pd.DataFrame(columns=columns)
 	for order, dom in enumerate(doms):
 		list_len = op_df.loc[dom, "OPTIMAL"]
 		dom_df = lists.loc[lists["DOMAIN"] == dom][:list_len]
 		new = new.append(dom_df)
-	new.to_csv("ontology/lists/lists_{}_opsim.csv".format(framework), index=None)
+	new.to_csv("{}lists/lists_{}_opsim.csv".format(path, framework), index=None)
 	return new
+
 
 def compute_centroid(df, labels, vsm, level="DOMAIN"):
 	centroids = []
@@ -587,12 +658,44 @@ def plot_violin(ax, boot, obs, labs, colors, alphas, font_xlg, fdrs=[], sig=Fals
 			fdr = fdrs[i]
 			for alpha, y in zip(alphas, [0, 0.0425, 0.085]):
 				if fdr < alpha:
-					plt.text(i-0.1325, max(data) + y, "*", 
-							 fontproperties=font_xlg)
+					plt.text(i-0.1325, max(data) + y, "*", fontproperties=font_xlg)
 
 
-def plot_rdoc_similarity(doms, new_sim_null, lower, upper, mccoy_sim_boot, mccoy_sim_obs,
-						 new_sim_boot, new_sim_obs, fdrs_dif, alphas, font=arial):
+def compute_rdoc_similarity(doms, seeds_rdoc, lists_rdoc, vsm_rdoc, n_iter=1000, interval=0.999, path=""):
+
+	from statsmodels.stats.multitest import multipletests
+	np.random.seed(42)
+	
+	mccoy = pd.read_csv("{}lists/lists_cqh.csv".format(path), index_col=None)
+	
+	seeds_centroid = compute_centroid(seeds_rdoc, doms, vsm_rdoc)
+	lists_centroid = compute_centroid(lists_rdoc, doms, vsm_rdoc)
+	mccoy_centroid = compute_centroid(mccoy, doms, vsm_rdoc)
+
+	stats = {"lists": {}, "mccoy": {}}
+
+	stats["lists"]["boot"], stats["mccoy"]["boot"] = np.empty((len(doms), n_iter)), np.empty((len(doms)-1, n_iter))
+	for n in range(n_iter):
+		stats["lists"]["boot"][:,n] = 1.0 - compute_sims_sample(lists_centroid, seeds_centroid, vsm_rdoc)
+		stats["mccoy"]["boot"][:(len(doms)-1),n] = (1.0 - compute_sims_sample(mccoy_centroid, seeds_centroid, vsm_rdoc))[:(len(doms)-1)]
+
+	stats["lists"]["null"] = np.empty((len(doms), n_iter))
+	for n in range(n_iter):
+		stats["lists"]["null"][:,n] = 1.0 - compute_sims_shuffle(lists_centroid, seeds_centroid, vsm_rdoc)
+		
+	stats["lists"]["obs"] = np.reshape(1.0 - compute_sims(lists_rdoc, seeds_centroid, doms, vsm_rdoc), (len(doms), 1))
+	stats["mccoy"]["obs"] = np.reshape(1.0 - compute_sims(mccoy, seeds_centroid, doms, vsm_rdoc), (len(doms), 1))
+
+	pvals_dif = np.sum(np.less(stats["lists"]["boot"][:(len(doms)-1),:] - stats["mccoy"]["boot"], 0.0), axis=1) / n_iter
+	stats["fdrs"] = multipletests(pvals_dif, method="fdr_bh")[1] # Benjamini-Hochberg
+
+	stats["lists"]["lower"] = [sorted(stats["lists"]["null"][i,:])[int(n_iter*(1.0-interval))] for i in range(len(doms))]
+	stats["lists"]["upper"] = [sorted(stats["lists"]["null"][i,:])[int(n_iter*interval)] for i in range(len(doms))]
+	
+	return stats
+
+
+def plot_rdoc_similarity(doms, stats, alphas=[0.01, 0.001], font=style.font, path="ontology/"):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import cm, font_manager, rcParams
@@ -603,15 +706,15 @@ def plot_rdoc_similarity(doms, new_sim_null, lower, upper, mccoy_sim_boot, mccoy
 
 	fig = plt.figure(figsize=(2.9, 4.5))
 	ax = fig.add_axes([0,0,1,1])
-	plt.plot(range(len(doms)), new_sim_null.mean(axis=1),
+	plt.plot(range(len(doms)), stats["lists"]["null"].mean(axis=1),
 			 "gray", linestyle="dashed", linewidth=2)
-	plt.fill_between(range(len(doms)), lower, y2=upper, 
+	plt.fill_between(range(len(doms)), stats["lists"]["lower"], y2=stats["lists"]["upper"], 
 					 color="gray", alpha=0.2)
-	plot_violin(ax, mccoy_sim_boot, mccoy_sim_obs, doms[:-1], ["k"]*5, alphas, font_xlg), 
-	plot_violin(ax, new_sim_boot, new_sim_obs, doms, palettes["rdoc"], alphas, font_xlg,
-				fdrs=fdrs_dif, sig=True)
+	plot_violin(ax, stats["mccoy"]["boot"], stats["mccoy"]["obs"], doms[:-1], ["k"]*5, alphas, font_xlg), 
+	plot_violin(ax, stats["lists"]["boot"], stats["lists"]["obs"], doms, style.palettes["rdoc"], 
+				alphas, font_xlg, fdrs=stats["fdrs"], sig=True)
 	plt.xlim([-0.75, len(doms)-0.5])
-	plt.ylim([-0.3, 1.1])
+	plt.ylim([-0.4, 1.1])
 	for side in ["right", "top"]:
 		ax.spines[side].set_visible(False)
 	ax.xaxis.set_tick_params(width=1.5, length=7)
@@ -619,7 +722,7 @@ def plot_rdoc_similarity(doms, new_sim_null, lower, upper, mccoy_sim_boot, mccoy
 	ax.set_xticks(range(len(doms)))
 	ax.set_xticklabels([])
 	plt.yticks(fontproperties=font_lg)
-	plt.savefig("ontology/figures/rdoc_seed_sim.png", 
+	plt.savefig("{}figures/rdoc_seed_sim.png".format(path), 
 				dpi=250, bbox_inches="tight")
 	plt.close()
 
