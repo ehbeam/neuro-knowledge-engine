@@ -5,12 +5,16 @@ import pandas as pd
 import numpy as np
 
 
-def load_archetypes(lists, circuits):
+def load_docs(dtm, act, words):
 
-	import collections
+	docs = dtm[words].copy()
+	docs[list(act.columns)] = act.copy()
 
-	domains = list(collections.OrderedDict.fromkeys(lists["DOMAIN"]))
-	words = sorted(list(set(lists["TOKEN"])))
+	return docs
+
+
+def load_archetypes(lists, circuits, domains, words):
+
 	structures = sorted(list(set(circuits.index)))
 	archetypes = pd.DataFrame(0.0, index=words+structures, columns=domains)
 	for dom in domains:

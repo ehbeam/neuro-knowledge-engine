@@ -239,11 +239,11 @@ def compute_eval_boot_direction(stats, direction, n_circuits, clf, features, fit
 
 	file = "{}data/circuits_{}_{}_boot_{}iter.csv".format(path, clf, direction, n_iter)
 	if not os.path.exists(file):
-		print("Bootstrap for N Domains | {}".format(direction.title()))
+		print("    Bootstrap for N Domains | {}".format(direction.title()))
 		
 		for i, k in enumerate(n_circuits):
 			if i % 10 == 0 and verbose:
-				print("   Processing {}th k".format(i))
+				print("\t  Processing {}th k".format(i))
 			function_features, structure_features = load_eval_data(features, k, ids)
 			if direction == "forward":
 				x, y_true = function_features, structure_features
@@ -283,11 +283,11 @@ def compute_eval_null_direction(stats, direction, n_circuits, clf, features, fit
 	file = "{}data/circuits_{}_{}_null_{}iter.csv".format(path, clf, direction, n_iter)
 	
 	if not os.path.exists(file):
-		print("Permutation for N Domains | {}".format(direction.title()))
+		print("    Permutation for N Domains | {}".format(direction.title()))
 		
 		for i, k in enumerate(n_circuits):
 			if i % 10 == 0 and verbose:
-				print("   Processing {}th k".format(i))
+				print("\t  Processing {}th k".format(i))
 			function_features, structure_features = load_eval_data(features, k, ids)
 			if direction == "forward":
 				x, y_true = function_features, structure_features

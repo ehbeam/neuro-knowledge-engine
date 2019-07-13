@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import collections
+import collections, os
 import pandas as pd
 import numpy as np
 
@@ -9,14 +9,19 @@ sys.path.append("..")
 import utilities
 
 
-def compute_gen_obs(stats, framework, domains, dom2docs, clf="_lr", path=""):
+def compute_gen_obs(stats, framework, domains, dom2docs, archetypes, docs, pmids, 
+					metric="dice", clf="_lr", path=""):
+
+	from scipy.spatial.distance import cdist
+
+	print("\t  Computing observed values")
 
 	df_obs = pd.DataFrame(index=domains, columns=pmids)
 	for dom in domains:
 		dom_pmids = dom2docs[dom]
 		dom_vecs = docs.loc[dom_pmids].values
 		dom_arche = archetypes[dom].values.reshape(1, archetypes.shape[0])
-		dom_sims = 1.0 - cdist(dom_vecs, dom_arche, metric="dice")
+		dom_sims = 1.0 - cdist(dom_vecs, dom_arche, metric=metric)
 		df_obs.loc[dom, dom_pmids] = dom_sims[:,0]
 	df_obs.to_csv("{}data/arche_obs_{}{}.csv".format(path, framework, clf))
 	stats["obs"][framework] = df_obs
@@ -33,9 +38,13 @@ def compute_gen_mean(stats, framework, domains, clf="_lr", path=""):
 	return stats
 
 
-def compute_gen_boot(stats, framework, domains, dom2docs, archetypes, n_iter=1000, clf="_lr", path=""):
+def compute_gen_boot(stats, framework, domains, dom2docs, archetypes, docs, 
+					 metric="dice", n_iter=1000, clf="_lr", path=""):
 
+	from scipy.spatial.distance import cdist
 	np.random.seed(42)
+
+	print("\t  Computing bootstrap distribution")
 
 	file_boot = "{}data/arche_boot_{}{}_{}iter.csv".format(path, framework, clf, n_iter)
 	
@@ -48,7 +57,7 @@ def compute_gen_boot(stats, framework, domains, dom2docs, archetypes, n_iter=100
 				dom_pmids = dom2docs[dom]
 				dom_vecs = docs.loc[dom_pmids].values[:,boot]
 				dom_arche = archetypes.values[boot,i].reshape(1, archetypes.shape[0])
-				df_boot[i,n] = 1.0 - np.mean(cdist(dom_vecs, dom_arche, metric="dice"))
+				df_boot[i,n] = 1.0 - np.mean(cdist(dom_vecs, dom_arche, metric=metric))
 			if n % int(n_iter / 10.0) == 0:
 				print("\t\tProcessed {} iterations".format(n))
 		df_boot = pd.DataFrame(df_boot, index=domains, columns=range(n_iter))
@@ -62,9 +71,13 @@ def compute_gen_boot(stats, framework, domains, dom2docs, archetypes, n_iter=100
 	return stats
 
 
-def compute_gen_null(stats, framework, domains, dom2docs, archetypes, n_iter=1000, clf="_lr", path=""):
+def compute_gen_null(stats, framework, domains, dom2docs, archetypes, docs, 
+					 metric="dice", n_iter=1000, clf="_lr", path=""):
 
+	from scipy.spatial.distance import cdist
 	np.random.seed(42)
+
+	print("\t  Computing null distribution")
 
 	file_null = "{}data/arche_null_{}{}_{}iter.csv".format(path, framework, clf, n_iter)
 	
@@ -78,7 +91,7 @@ def compute_gen_null(stats, framework, domains, dom2docs, archetypes, n_iter=100
 				dom_pmids = dom2docs[dom]
 				dom_vecs = docs.loc[dom_pmids].values
 				dom_arche = archetypes.values[null,i].reshape(1, archetypes.shape[0])
-				df_null[i,n] = 1.0 - np.mean(cdist(dom_vecs, dom_arche, metric="dice"))
+				df_null[i,n] = 1.0 - np.mean(cdist(dom_vecs, dom_arche, metric=metric))
 			if n % int(n_iter / 10.0) == 0:
 				print("\t\tProcessed {} iterations".format(n))
 		df_null = pd.DataFrame(df_null, index=domains, columns=range(n_iter))
@@ -92,15 +105,16 @@ def compute_gen_null(stats, framework, domains, dom2docs, archetypes, n_iter=100
 	return stats
 
 
-def compute_gen_stats(stats, framework, lists, dom2docs, archetypes, n_iter=1000, alpha=0.001, clf="_lr", path=""):
+def compute_gen_stats(stats, framework, lists, dom2docs, archetypes, docs, pmids, 
+					  metric="dice", n_iter=1000, alpha=0.001, clf="_lr", path=""):
 
 	domains = list(collections.OrderedDict.fromkeys(lists["DOMAIN"]))
 	
-	stats = compute_gen_obs(stats, framework, domains, dom2docs, clf=clf, path=path)
+	stats = compute_gen_obs(stats, framework, domains, dom2docs, archetypes, docs, pmids, metric=metric, clf=clf, path=path)
 	stats = compute_gen_mean(stats, framework, domains, clf=clf, path=path)
-	stats = compute_gen_boot(stats, framework, domains, dom2docs, archetypes, n_iter=n_iter, clf=clf, path=path)
-	stats = compute_gen_null(stats, framework, domains, dom2docs, archetypes, n_iter=n_iter, clf=clf, path=path)
-	stats = utilities.compare_to_null(stats["null"][framework], stats["mean"][framework], n_iter, alpha=alpha)
+	stats = compute_gen_boot(stats, framework, domains, dom2docs, archetypes, docs, metric=metric, n_iter=n_iter, clf=clf, path=path)
+	stats = compute_gen_null(stats, framework, domains, dom2docs, archetypes, docs, metric=metric, n_iter=n_iter, clf=clf, path=path)
+	stats["null_comparison"][framework] = utilities.compare_to_null(stats["null"][framework], stats["mean"][framework], n_iter, alpha=alpha)
 	
 	return stats
 

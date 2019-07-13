@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import collections
+import collections, os
 import pandas as pd
 import numpy as np
 
@@ -9,14 +9,10 @@ sys.path.append("..")
 import utilities
 
 
-def compute_mod_obs(stats, framework, domains, dom2docs, clf="_lr", path=""):
-
-	file_obs = "{}data/mod_obs_{}{}.csv".format(path, framework, clf)
-	file_mean = "{}data/mod_mean_{}{}.csv".format(path, framework, clf)
-	print("\tComputing observed values")
+def sort_dists(domains, dom2docs, doc2dom, dists):
 
 	sorted_pmids = []
-	for dom in range(len(circuits.columns)):
+	for dom in range(len(domains)):
 		sorted_pmids += [pmid for pmid, sys in doc2dom.items() if sys == dom + 1]
 	sorted_dists = dists[sorted_pmids].loc[sorted_pmids]
 
@@ -25,6 +21,15 @@ def compute_mod_obs(stats, framework, domains, dom2docs, clf="_lr", path=""):
 		dom_pmids = dom2docs[dom]
 		dom_idx[dom]["min"] = sorted_pmids.index(dom_pmids[0])
 		dom_idx[dom]["max"] = sorted_pmids.index(dom_pmids[-1]) + 1
+
+	return sorted_dists, dom_idx
+
+
+def compute_mod_obs(stats, framework, domains, dom2docs, doc2dom, sorted_dists, dom_idx, pmids, clf="_lr", path=""):
+
+	file_obs = "{}data/mod_obs_{}{}.csv".format(path, framework, clf)
+	file_mean = "{}data/mod_mean_{}{}.csv".format(path, framework, clf)
+	print("\t  Computing observed values")
 
 	dists_int, dists_ext = {}, {}
 	df_obs = pd.DataFrame(index=domains, columns=pmids)
@@ -52,9 +57,9 @@ def compute_mod_obs(stats, framework, domains, dom2docs, clf="_lr", path=""):
 	df_mean.to_csv(file_mean)	
 
 	stats["obs"][framework] = df_obs
-	stats["obs"][framework] = df_mean
+	stats["mean"][framework] = df_mean
 
-	return stats, dom_idx, dists_int, dists_ext
+	return stats, dists_int, dists_ext
 
 
 def compute_mod_boot(stats, framework, domains, dom2docs, dists_int, dists_ext, n_iter=1000, clf="_lr", path=""):
@@ -63,7 +68,7 @@ def compute_mod_boot(stats, framework, domains, dom2docs, dists_int, dists_ext, 
 
 	file_boot = "{}data/mod_boot_{}{}_{}iter.csv".format(path, framework, clf, n_iter)
 	if not os.path.isfile(file_boot):
-		print("\tComputing bootstrap distribution")
+		print("\t  Computing bootstrap distribution")
 		df_boot = np.empty((len(domains), n_iter))
 		
 		for n in range(n_iter):
@@ -98,7 +103,7 @@ def compute_mod_null(stats, framework, domains, dom2docs, sorted_dists, dom_idx,
 	file_null = "{}data/mod_null_{}{}_{}iter.csv".format(path, framework, clf, n_iter)
 
 	if not os.path.isfile(file_null):
-		print("\tComputing null distribution")
+		print("\t  Computing null distribution")
 		null_dists = sorted_dists.values.copy()
 		df_null = np.empty((len(domains), n_iter))
 		
@@ -132,10 +137,12 @@ def compute_mod_null(stats, framework, domains, dom2docs, sorted_dists, dom_idx,
 	return stats
 
 
-def compute_mod_stats(stats, framework, lists, dom2docs, doc2dom, dists, clf="_lr", n_iter=1000, alpha=0.001, path=""):
+def compute_mod_stats(stats, framework, lists, dom2docs, doc2dom, dists, pmids, clf="_lr", n_iter=1000, alpha=0.001, path=""):
 
 	domains = list(collections.OrderedDict.fromkeys(lists["DOMAIN"]))
-	stats, dom_idx, dists_int, dists_ext = compute_mod_obs(stats, framework, domains, dom2docs, clf=clf, path=path)
+	sorted_dists, dom_idx = sort_dists(domains, dom2docs, doc2dom, dists)
+
+	stats, dists_int, dists_ext = compute_mod_obs(stats, framework, domains, dom2docs, doc2dom, sorted_dists, dom_idx, pmids, clf=clf, path=path)
 	stats = compute_mod_boot(stats, framework, domains, dom2docs, dists_int, dists_ext, n_iter=n_iter, clf=clf, path=path)
 	stats = compute_mod_null(stats, framework, domains, dom2docs, sorted_dists, dom_idx, n_iter=n_iter, clf=clf, path=path)
 	stats["null_comparison"][framework] = utilities.compare_to_null(stats["null"][framework], stats["mean"][framework], n_iter, alpha=alpha)

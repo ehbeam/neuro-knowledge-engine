@@ -137,17 +137,17 @@ for k in range(args.n_domains):
 lists, circuits = ontology.export_ontology(lists, circuits, args.n_domains, args.ord_domains, args.clf, 
 										   act, k2name, path=ontol_path)
 
-# # Plot the term lists
-# print("\n------ Plotting word clouds")
-# doms_dd = [k2name[k] for k in args.ord_domains]
-# ontology.plot_wordclouds("data-driven", doms_dd, lists, dtm[lexicon], width=600,
-# 						 font=args.font, path=ontol_path, print_fig=False)
+# Plot the term lists
+print("\n------ Plotting word clouds")
+doms_dd = [k2name[k] for k in args.ord_domains]
+ontology.plot_wordclouds("data-driven", doms_dd, lists, dtm[lexicon], width=600,
+						 font=args.font, path=ontol_path, print_fig=False)
 
-# # Plot the brain circuits
-# print("\n------ Plotting circuit maps")
-# utilities.map_plane(circuits, atlas, "{}figures/circuits/data-driven_{}".format(ontol_path, args.clf), 
-# 		  			plane="z", cmaps=style.colormaps["data-driven"], cbar=True, 
-# 		  			vmin=0.0, vmax=2.0, annotate=True, suffix="_z", verbose=False, print_fig=False)
+# Plot the brain circuits
+print("\n------ Plotting circuit maps")
+utilities.map_plane(circuits, atlas, "{}figures/circuits/data-driven_{}".format(ontol_path, args.clf), 
+		  			plane="z", cmaps=style.colormaps["data-driven"], cbar=True, 
+		  			vmin=0.0, vmax=2.0, annotate=True, suffix="_z", verbose=False, print_fig=False)
 
 
 ################################################
@@ -185,17 +185,17 @@ stats = ontology.compute_rdoc_similarity(doms_rdoc, seeds_rdoc, lists_rdoc, vsm_
 										 n_iter=args.n_iter_fw, interval=args.ci, path=ontol_path)
 ontology.plot_rdoc_similarity(doms_rdoc, stats, font=args.font, path=ontol_path)
 
-# # Plot the term lists
-# print("\n------ Plotting word clouds")
-# ontology.plot_wordclouds("rdoc", doms_rdoc, lists_rdoc, dtm, 
-# 						 font=args.font, print_fig=False, path=ontol_path)
+# Plot the term lists
+print("\n------ Plotting word clouds")
+ontology.plot_wordclouds("rdoc", doms_rdoc, lists_rdoc, dtm, 
+						 font=args.font, print_fig=False, path=ontol_path)
 
-# # Plot the brain circuits
-# print("\n------ Plotting circuit maps")
-# circuits_rdoc = ontology.load_framework_circuit(lists_rdoc, dtm, act, "rdoc")
-# utilities.map_plane(circuits_rdoc, atlas, "{}figures/circuits/rdoc".format(ontol_path), 
-# 	  				cmaps=style.colormaps["rdoc"], plane="z", cbar=True, vmin=0.0, vmax=0.6,
-# 	  				annotate=True, suffix="_z", verbose=False, print_fig=False)
+# Plot the brain circuits
+print("\n------ Plotting circuit maps")
+circuits_rdoc = ontology.load_framework_circuit(lists_rdoc, dtm, act, "rdoc")
+utilities.map_plane(circuits_rdoc, atlas, "{}figures/circuits/rdoc".format(ontol_path), 
+	  				cmaps=style.colormaps["rdoc"], plane="z", cbar=True, vmin=0.0, vmax=0.6,
+	  				annotate=True, suffix="_z", verbose=False, print_fig=False)
 
 
 ###### DSM ######
@@ -229,17 +229,17 @@ lists_dsm = lists_dsm.loc[lists_dsm["DOMAIN"].isin(doms_dsm_filt)]
 lists_dsm = lists_dsm.loc[lists_dsm["DISTANCE"] > 0]
 lists_dsm.to_csv("{}lists/lists_dsm_opsim.csv".format(ontol_path), index=None)
 
-# # Plot the term lists
-# print("\n------ Plotting word clouds")
-# ontology.plot_wordclouds("dsm", doms_dsm_filt, lists_dsm, dtm,
-# 						 path=ontol_path, font=args.font, print_fig=False)
+# Plot the term lists
+print("\n------ Plotting word clouds")
+ontology.plot_wordclouds("dsm", doms_dsm_filt, lists_dsm, dtm,
+						 path=ontol_path, font=args.font, print_fig=False)
 
-# # Plot the brain circuits
-# print("\n------ Plotting circuit maps")
-# circuits_dsm = ontology.load_framework_circuit(lists_dsm, dtm, act, "dsm")
-# utilities.map_plane(circuits_dsm, atlas, "{}figures/circuits/dsm".format(ontol_path), 
-# 	  				cmaps=style.colormaps["dsm"], plane="z", cbar=True, vmin=0.0, vmax=0.6,
-# 	  				annotate=True, suffix="_z", verbose=False, print_fig=False)
+# Plot the brain circuits
+print("\n------ Plotting circuit maps")
+circuits_dsm = ontology.load_framework_circuit(lists_dsm, dtm, act, "dsm")
+utilities.map_plane(circuits_dsm, atlas, "{}figures/circuits/dsm".format(ontol_path), 
+	  				cmaps=style.colormaps["dsm"], plane="z", cbar=True, vmin=0.0, vmax=0.6,
+	  				annotate=True, suffix="_z", verbose=False, print_fig=False)
 
 
 ################################################
@@ -307,8 +307,9 @@ for framework in frameworks:
 		precision, recall = evaluation.compute_prc(labels, pred_probs)
 		evaluation.plot_curves("prc", framework, direction, recall, precision, palette[direction], opacity=opacity[direction], 
 							   diag=False, font=args.font, path=clf_path, print_fig=False)
-		rep_stats = evaluation.compute_eval_stats(rep_stats, framework, direction, features, labels, pred_probs, preds, splits, index,
-											  	  n_iter=args.n_iter, interval=args.ci, metric_labels=metric_labels, path=clf_path)
+		rep_stats = evaluation.compute_eval_stats(rep_stats, framework, direction, features, labels, pred_probs, preds, 
+												  splits["test"], index, n_iter=args.n_iter, interval=args.ci, 
+												  metric_labels=metric_labels, path=clf_path)
 		for metric in metric_labels:
 			evaluation.plot_eval_metric(metric, framework, direction, rep_stats["obs"][framework][direction][metric], 
 							 			rep_stats["boot"][framework][direction][metric], rep_stats["null_ci"][direction][metric], 
@@ -352,33 +353,6 @@ stats_keys = ["obs", "mean", "boot", "null", "null_comparison"]
 mod_stats = {stat: {} for stat in stats_keys} 
 gen_stats = {stat: {} for stat in stats_keys}
 
-# Computing distances is expensive, so only proceed if needed to produce an intermediary data file
-compute_dists, compute_mod, compute_gen = False, False, False
-for framework in frameworks:
-	
-	mod_files = ["{}data/mod_obs_{}{}.csv".format(mod_path, framework, clfs[framework]), 
-			 	 "{}data/mod_null_{}{}_{}iter.csv".format(mod_path, framework, clfs[framework], args.n_iter),
-			 	 "{}data/mod_boot_{}{}_{}iter.csv".format(mod_path, framework, clfs[framework], args.n_iter)]
-	for file in mod_files:
-		if not os.path.exists(file):
-			compute_dists, compute_mod = True, True
-
-	gen_files = ["{}data/arche_obs_{}{}.csv".format(gen_path, framework, clfs[framework]),
-			 	 "{}data/arche_null_{}{}_{}iter.csv".format(gen_path, framework, clfs[framework], args.n_iter),
-			 	 "{}data/arche_boot_{}{}_{}iter.csv".format(gen_path, framework, clfs[framework], args.n_iter)]
-	for file in gen_files:
-		if not os.path.exists(file):
-			compute_dists, compute_gen = True, True
-
-# Combine word and structure occurrences across articles
-docs = dtm.copy()
-docs[list(act.columns)] = act.copy()
-
-# Compute distances if intermediary files are missing
-if compute_dists:
-	print("\n------ Computing article distances")
-	dists = partition.compute_distances(docs)
-
 # Parameters for multidimensional scaling (MDS)
 metric = True
 eps = 0.001
@@ -394,10 +368,14 @@ for framework in frameworks:
 
 	# Load framework data
 	lists, circuits = utilities.load_framework(framework, clf=clfs[framework], suffix=suffixes[framework], path=ontol_path)
+	words = sorted(list(set(lists["TOKEN"])))
 	domains = circuits.columns
 
+	# Combine word and structure occurrences across articles
+	docs = partition.load_docs(dtm, act, words)
+
 	# Compute "archetypes" of included words and structures
-	archetypes = partition.load_archetypes(lists, circuits)
+	archetypes = partition.load_archetypes(lists, circuits, domains, words)
 
 	# Partition articles by similarity to domain archetypes
 	doc2dom, dom2docs = partition.load_partition(framework, clfs[framework], archetypes, docs)
@@ -408,6 +386,32 @@ for framework in frameworks:
 	# mds.plot_mds(X, framework, colors, markers, metric=metric, eps=eps, max_iter=max_iter, 
 	# 			 path="mds/", suffix=clfs[framework], print_fig=False)
 
+	# Computing distances and related metrics is expensive, so only proceed if intermediary data file is missing
+	compute_dists, compute_mod, compute_gen = False, False, False
+		
+	mod_files = ["{}data/mod_obs_{}{}.csv".format(mod_path, framework, clfs[framework]), 
+				 "{}data/mod_mean_{}{}.csv".format(mod_path, framework, clfs[framework]),
+			 	 "{}data/mod_null_{}{}_{}iter.csv".format(mod_path, framework, clfs[framework], args.n_iter),
+			 	 "{}data/mod_boot_{}{}_{}iter.csv".format(mod_path, framework, clfs[framework], args.n_iter)]
+	for file in mod_files:
+		if not os.path.exists(file):
+			compute_dists, compute_mod = True, True
+
+	gen_files = ["{}data/arche_obs_{}{}.csv".format(gen_path, framework, clfs[framework]),
+				 "{}data/arche_mean_{}{}.csv".format(gen_path, framework, clfs[framework]),
+			 	 "{}data/arche_null_{}{}_{}iter.csv".format(gen_path, framework, clfs[framework], args.n_iter),
+			 	 "{}data/arche_boot_{}{}_{}iter.csv".format(gen_path, framework, clfs[framework], args.n_iter)]
+	for file in gen_files:
+		if not os.path.exists(file):
+			compute_dists, compute_gen = True, True
+
+	if not os.path.exists("partition/data/doc2dom_{}_{}.csv".format(framework, clfs[framework])):
+		compute_dists = True
+
+	if compute_dists:
+		print("\n--------- Computing article distances")
+		dists = partition.compute_distances(docs)
+
 
 	################################################
 	############# 5. Assess modularity #############
@@ -417,7 +421,7 @@ for framework in frameworks:
 
 	# Compute statistics for domain modularity
 	if compute_mod:
-		mod_stats = modularity.compute_mod_stats(mod_stats, framework, lists, dom2docs, 
+		mod_stats = modularity.compute_mod_stats(mod_stats, framework, lists, dom2docs, doc2dom, dists, pmids,
 												 clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=mod_path)
 	else:
 		mod_stats = utilities.load_partition_stats(mod_stats, "mod", framework, lists, dom2docs, 
@@ -438,7 +442,7 @@ for framework in frameworks:
 
 	# Compute statistics for domain similarity to archetypes
 	if compute_gen:
-		gen_stats = archetype.compute_gen_stats(gen_stats, framework, lists, dom2docs, archetypes, 
+		gen_stats = archetype.compute_gen_stats(gen_stats, framework, lists, dom2docs, archetypes, docs, pmids,
 												clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=gen_path)
 	else:
 		gen_stats = utilities.load_partition_stats(gen_stats, "arche", framework, lists, dom2docs, 

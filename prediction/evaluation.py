@@ -128,7 +128,7 @@ def compute_eval_obs(stats, framework, direction, labels, pred_probs, preds):
 	return stats
 
 
-def compute_eval_boot(stats, framework, direction, labels, pred_probs, preds, n_iter=1000, path=""):
+def compute_eval_boot(stats, framework, direction, labels, pred_probs, preds, ids, n_iter=1000, path=""):
 
 	from sklearn.metrics import roc_auc_score, f1_score
 
@@ -143,7 +143,7 @@ def compute_eval_boot(stats, framework, direction, labels, pred_probs, preds, n_
 		stats["boot"][framework][direction]["rocauc"] = pd.read_csv(rocauc_file, index_col=0, header=0).values
 	else:
 		for n in range(n_iter):
-			samp = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=True)
+			samp = np.random.choice(range(len(ids)), size=len(ids), replace=True)
 			stats["boot"][framework][direction]["rocauc"][:,n] = compute_eval_metric(labels[samp,:], pred_probs[samp,:], roc_auc_score)
 	
 	f1_file = "{}data/f1_boot_{}_{}_{}iter.csv".format(path, framework, direction, n_iter)
@@ -151,13 +151,13 @@ def compute_eval_boot(stats, framework, direction, labels, pred_probs, preds, n_
 		stats["boot"][framework][direction]["f1"] = pd.read_csv(f1_file, index_col=0, header=0).values
 	else:
 		for n in range(n_iter):
-			samp = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=True)
+			samp = np.random.choice(range(len(ids)), size=len(ids), replace=True)
 			stats["boot"][framework][direction]["f1"][:,n] = compute_eval_metric(labels[samp,:], preds[samp,:], f1_score)
 
 	return stats
 
 
-def compute_eval_null(stats, framework, direction, labels, pred_probs, preds, n_iter=1000, path=""):
+def compute_eval_null(stats, framework, direction, labels, pred_probs, preds, ids, n_iter=1000, path=""):
 
 	from sklearn.metrics import roc_auc_score, f1_score
 
@@ -172,17 +172,17 @@ def compute_eval_null(stats, framework, direction, labels, pred_probs, preds, n_
 		stats["null"][framework][direction]["rocauc"] = pd.read_csv(rocauc_file, index_col=0, header=0).values
 	else:
 		for n in range(n_iter):
-			shuf = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=False)
+			shuf = np.random.choice(range(len(ids)), size=len(ids), replace=False)
 			stats["null"][framework][direction]["rocauc"][:,n] = compute_eval_metric(labels[shuf,:], pred_probs, roc_auc_score)
 			if n % (n_iter/10) == 0:
-				print("\tProcessed {} iterations".format(n))
+				print("\t  Processed {} iterations".format(n))
 	
 	f1_file = "{}data/f1_null_{}_{}_{}iter.csv".format(path, framework, direction, n_iter)
 	if os.path.isfile(f1_file):
 		stats["null"][framework][direction]["f1"] = pd.read_csv(f1_file, index_col=0, header=0).values
 	else:
 		for n in range(n_iter):
-			samp = np.random.choice(range(len(splits["test"])), size=len(splits["test"]), replace=True)
+			samp = np.random.choice(range(len(ids)), size=len(ids), replace=True)
 			stats["null"][framework][direction]["f1"][:,n] = compute_eval_metric(labels[shuf,:], preds, f1_score)
 
 	return stats
@@ -232,12 +232,12 @@ def export_eval_stats(stats, framework, direction, metric_labels, index, n_iter=
 		obs_df.to_csv("{}data/{}_obs_{}_{}.csv".format(path, metric, framework, direction), header=None)
 
 
-def compute_eval_stats(stats, framework, direction, features, labels, pred_probs, preds, splits, index,
+def compute_eval_stats(stats, framework, direction, features, labels, pred_probs, preds, ids, index,
 					   n_iter=1000, interval=0.999, metric_labels=["rocauc", "f1"], path="logistic_regression/"):
 	
 	stats = compute_eval_obs(stats, framework, direction, labels, pred_probs, preds)
-	stats = compute_eval_boot(stats, framework, direction, labels, pred_probs, preds, n_iter=n_iter, path=path)
-	stats = compute_eval_null(stats, framework, direction, labels, pred_probs, preds, n_iter=n_iter, path=path)
+	stats = compute_eval_boot(stats, framework, direction, labels, pred_probs, preds, ids, n_iter=n_iter, path=path)
+	stats = compute_eval_null(stats, framework, direction, labels, pred_probs, preds, ids, n_iter=n_iter, path=path)
 	stats = compute_eval_null_ci(stats, framework, direction, n_iter=n_iter, interval=interval, metric_labels=metric_labels)
 	stats = compute_eval_null_comparison(stats, framework, direction, n_iter=n_iter, interval=interval, metric_labels=metric_labels)
 	
