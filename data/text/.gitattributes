@@ -1,0 +1,2 @@
+glove_gen_n100_win15_min5_iter500_190428.txt filter=lfs diff=lfs merge=lfs -text
+glove_psy_n100_win15_min5_iter500_190428.txt filter=lfs diff=lfs merge=lfs -text
