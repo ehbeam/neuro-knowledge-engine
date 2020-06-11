@@ -24,23 +24,23 @@ def doc_mean_thres(df):
 
 
 def load_doc_term_matrix(version=190325, binarize=True):
-  dtm = pd.read_csv("../../data/text/dtm_{}.csv.gz".format(version), compression="gzip", index_col=0)
+  dtm = pd.read_csv("../../../data/text/dtm_{}.csv.gz".format(version), compression="gzip", index_col=0)
   if binarize:
     dtm = doc_mean_thres(dtm)
   return dtm
 
 
 def load_coordinates():
-  atlas_labels = pd.read_csv("../../data/brain/labels.csv")
-  activations = pd.read_csv("../../data/brain/coordinates.csv", index_col=0)
+  atlas_labels = pd.read_csv("../../../data/brain/labels.csv")
+  activations = pd.read_csv("../../../data/brain/coordinates.csv", index_col=0)
   activations = activations[atlas_labels["PREPROCESSED"]]
   return activations
 
 
 def load_raw_domains(k):
-  list_file = "../lists/lists_k{:02d}.csv".format(k)
+  list_file = "../../lists/lists_k{:02d}.csv".format(k)
   lists = pd.read_csv(list_file, index_col=None)
-  circuit_file = "../circuits/circuits_k{:02d}.csv".format(k)
+  circuit_file = "../../circuits/circuits_k{:02d}.csv".format(k)
   circuits = pd.read_csv(circuit_file, index_col=None)
   return lists, circuits
 
@@ -200,7 +200,7 @@ def optimize_list_len(k):
     # Load the data splits
     splits = {}
     for split in ["train", "validation"]:
-      splits[split] = [int(pmid.strip()) for pmid in open("../../data/splits/{}.txt".format(split), "r").readlines()]
+      splits[split] = [int(pmid.strip()) for pmid in open("../../../data/splits/{}.txt".format(split), "r").readlines()]
 
     act_bin = load_coordinates()
     dtm_bin = load_doc_term_matrix(version=190325, binarize=True)
@@ -234,13 +234,19 @@ def optimize_list_len(k):
             # Optimize forward inference classifier 
             train_set_f = load_mini_batches(dtm_bin[words], act_bin[structures], splits["train"], mini_batch_size=batch_size, seed=42)
             val_set_f = load_mini_batches(dtm_bin[words], act_bin[structures], splits["validation"], mini_batch_size=len(splits["validation"]), seed=42)
-            op_val_f = optimize_hyperparameters(param_list, train_set_f, val_set_f, n_epochs=n_epochs)
+            try:
+              op_val_f = optimize_hyperparameters(param_list, train_set_f, val_set_f, n_epochs=n_epochs)
+            except:
+              op_val_f = 0.0
             forward_scores.append(op_val_f)
 
             # Optimize reverse inference classifier
             train_set_r = load_mini_batches(act_bin[structures], dtm_bin[words], splits["train"], mini_batch_size=batch_size, seed=42)
             val_set_r = load_mini_batches(act_bin[structures], dtm_bin[words], splits["validation"], mini_batch_size=len(splits["validation"]), seed=42)
-            op_val_r = optimize_hyperparameters(param_list, train_set_r, val_set_r, n_epochs=n_epochs)
+            try:
+              op_val_r = optimize_hyperparameters(param_list, train_set_r, val_set_r, n_epochs=n_epochs)
+            except:
+              op_val_r = 0.0
             reverse_scores.append(op_val_r)
         
         scores = [(forward_scores[i] + reverse_scores[i])/2.0 for i in range(len(forward_scores))]
@@ -253,4 +259,4 @@ def optimize_list_len(k):
         op_df["ROC_AUC"] = max(scores)
         op_lists = op_lists.append(op_df)
 
-    op_lists.to_csv("../lists/lists_k{:02d}_oplen_nn.csv".format(k), index=None)
+    op_lists.to_csv("../../lists/lists_k{:02d}_oplen_nn.csv".format(k), index=None)

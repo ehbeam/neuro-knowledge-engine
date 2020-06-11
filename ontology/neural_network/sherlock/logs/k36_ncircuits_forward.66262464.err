@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "listify_circuits_k36_forward.py", line 4, in <module>
+    listify_circuits.optimize_circuits(36, 'forward')
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/neural_network/sherlock/listify_circuits.py", line 229, in optimize_circuits
+    lists, circuits = load_domains(k)
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/neural_network/sherlock/listify_circuits.py", line 51, in load_domains
+    lists = pd.read_csv(list_file, index_col=None)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/io/parsers.py", line 702, in parser_f
+    return _read(filepath_or_buffer, kwds)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/io/parsers.py", line 429, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/io/parsers.py", line 895, in __init__
+    self._make_engine(self.engine)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/io/parsers.py", line 1122, in _make_engine
+    self._engine = CParserWrapper(self.f, **self.options)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/io/parsers.py", line 1853, in __init__
+    self._reader = parsers.TextReader(src, **kwds)
+  File "pandas/_libs/parsers.pyx", line 387, in pandas._libs.parsers.TextReader.__cinit__
+  File "pandas/_libs/parsers.pyx", line 705, in pandas._libs.parsers.TextReader._setup_parser_source
+FileNotFoundError: [Errno 2] File b'../../lists/lists_k36_oplen_nn.csv' does not exist: b'../../lists/lists_k36_oplen_nn.csv'
+srun: error: sh02-02n10: task 0: Exited with exit code 1
+srun: Terminating job step 66262464.0

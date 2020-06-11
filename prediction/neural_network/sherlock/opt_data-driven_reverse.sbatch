@@ -8,5 +8,5 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=ebeam@stanford.edu
 
-module load python/3.6 py-pytorch/1.0.0_py36
+module load python/3.6 py-pytorch/1.0.0_py36 viz py-matplotlib/3.1.1_py36
 srun python3 opt_data-driven_reverse.py

@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "listify_circuits_k12_reverse.py", line 4, in <module>
+    listify_circuits.optimize_circuits(12, 'reverse')
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/neural_network/sherlock/listify_circuits.py", line 218, in optimize_circuits
+    splits[split] = [int(pmid.strip()) for pmid in open("../../data/splits/{}.txt".format(split), "r").readlines()]
+FileNotFoundError: [Errno 2] No such file or directory: '../../data/splits/train.txt'
+srun: error: sh02-02n10: task 0: Exited with exit code 1
+srun: Terminating job step 66214241.0

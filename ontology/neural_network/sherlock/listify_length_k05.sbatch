@@ -4,7 +4,7 @@
 #SBATCH --output=logs/k05_listlen.%j.out
 #SBATCH --error=logs/k05_listlen.%j.err
 #SBATCH --time=01-00:00:00
-#SBATCH -p normal
+#SBATCH -p aetkin
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=ebeam@stanford.edu
 

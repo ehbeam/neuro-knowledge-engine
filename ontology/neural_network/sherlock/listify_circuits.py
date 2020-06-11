@@ -25,14 +25,14 @@ def doc_mean_thres(df):
 
 
 def load_coordinates():
-  atlas_labels = pd.read_csv("../../data/brain/labels.csv")
-  activations = pd.read_csv("../../data/brain/coordinates.csv", index_col=0)
+  atlas_labels = pd.read_csv("../../../data/brain/labels.csv")
+  activations = pd.read_csv("../../../data/brain/coordinates.csv", index_col=0)
   activations = activations[atlas_labels["PREPROCESSED"]]
   return activations
 
 
 def load_doc_term_matrix(version=190124, binarize=True):
-  dtm = pd.read_csv("../../data/text/dtm_{}.csv.gz".format(version), compression="gzip", index_col=0)
+  dtm = pd.read_csv("../../../data/text/dtm_{}.csv.gz".format(version), compression="gzip", index_col=0)
   if binarize:
     dtm = doc_mean_thres(dtm)
   return dtm
@@ -41,15 +41,15 @@ def load_doc_term_matrix(version=190124, binarize=True):
 def load_lexicon(sources):
   lexicon = []
   for source in sources:
-    file = "../../lexicon/lexicon_{}.txt".format(source)
+    file = "../../../lexicon/lexicon_{}.txt".format(source)
     lexicon += [token.strip() for token in open(file, "r").readlines()]
   return sorted(lexicon)
 
 
 def load_domains(k):
-  list_file = "../lists/lists_k{:02d}_oplen_nn.csv".format(k)
+  list_file = "../../lists/lists_k{:02d}_oplen_nn.csv".format(k)
   lists = pd.read_csv(list_file, index_col=None)
-  circuit_file = "../circuits/circuits_k{:02d}.csv".format(k)
+  circuit_file = "../../circuits/circuits_k{:02d}.csv".format(k)
   circuits = pd.read_csv(circuit_file, index_col=None)
   return lists, circuits
 
@@ -215,7 +215,7 @@ def optimize_circuits(k, direction):
   # Load the data splits
   splits = {}
   for split in ["train", "validation"]:
-    splits[split] = [int(pmid.strip()) for pmid in open("../../data/splits/{}.txt".format(split), "r").readlines()]
+    splits[split] = [int(pmid.strip()) for pmid in open("../../../data/splits/{}.txt".format(split), "r").readlines()]
 
   # Specify the hyperparameters for the randomized grid search
   param_grid = {"lr": [0.001],

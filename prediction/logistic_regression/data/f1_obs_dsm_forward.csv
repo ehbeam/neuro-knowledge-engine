@@ -54,7 +54,9 @@ left_hippocampus,0.4361999379074822
 left_amygdala,0.4536702767749699
 left_accumbens,0.4781609195402299
 left_brainstem,0.46603940017641865
-left_cerebellum,0.3984763166611461
+left_cerebellar_lobules,0.41058098020123335
+left_cerebellar_crus,0.4420890937019969
+left_cerebellar_vermis,0.4859892442683272
 right_frontal_pole,0.34511359538406056
 right_insular_cortex,0.3765877102643323
 right_superior_frontal_gyrus,0.4980842396195085
@@ -91,13 +93,13 @@ right_frontal_orbital_cortex,0.3696633113502256
 right_parahippocampal_gyrus_anterior_division,0.45579862151633205
 right_parahippocampal_gyrus_posterior_division,0.4647804302976717
 right_lingual_gyrus,0.3920321392701708
-right_temporal_fusiform_cortex_anterior_division,0.4824736392134511
+right_temporal_fusiform_cortex_anterior_division,0.4826210826210826
 right_temporal_fusiform_cortex_posterior_division,0.4491962390051562
 right_temporal_occipital_fusiform_cortex,0.42128744423199493
 right_occipital_fusiform_gyrus,0.4012528849324102
 right_frontal_operculum_cortex,0.40459016393442626
 right_central_opercular_cortex,0.4094308943089431
-right_parietal_operculum_cortex,0.42622432859399684
+right_parietal_operculum_cortex,0.42640555906506633
 right_planum_polare,0.44140264533989537
 right_heschls_gyrus,0.4470158343483556
 right_planum_temporale,0.421102964615875
@@ -111,4 +113,6 @@ right_hippocampus,0.4368992248062015
 right_amygdala,0.45465465465465466
 right_accumbens,0.47801092267893075
 right_brainstem,0.4666666666666667
-right_cerebellum,0.3970783532536521
+right_cerebellar_lobules,0.4119170984455959
+right_cerebellar_crus,0.4395061728395062
+right_cerebellar_vermis,0.482178500142572

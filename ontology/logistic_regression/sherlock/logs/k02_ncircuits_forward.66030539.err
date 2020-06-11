@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "listify_circuits_k02_forward.py", line 4, in <module>
+    listify_circuits.optimize_circuits(2, 'forward')
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/logistic_regression/sherlock/listify_circuits.py", line 88, in optimize_circuits
+    lexicon = load_lexicon(["cogneuro"])
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/logistic_regression/sherlock/listify_circuits.py", line 33, in load_lexicon
+    lexicon += [token.strip() for token in open(file, "r").readlines()]
+FileNotFoundError: [Errno 2] No such file or directory: '../../../lexicon/lexicon_cogneuro.txt'
+srun: error: sh02-02n10: task 0: Exited with exit code 1
+srun: Terminating job step 66030539.0

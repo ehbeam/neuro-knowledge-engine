@@ -142,10 +142,10 @@ def load_domain_features(dtm, act, directions, n_circuits, suffix="", path=""):
 	return features
 
 
-def compute_cooccurrences(activations, scores):
+def compute_cooccurrences(activations, scores, positive=True):
 
 	X = np.matmul(activations.values.T, scores.values)
-	X = pmi(X, positive=True)
+	X = pmi(X, positive=positive)
 	X = pd.DataFrame(X, columns=scores.columns, index=activations.columns)
 	X = X.dropna(axis=1, how="any")
 	X = X.loc[:, (X != 0).any(axis=0)]
@@ -330,9 +330,9 @@ def compute_eval_stats(clf, directions, n_circuits, features, fits, ids,
 	return stats
 
 
-def plot_scores(direction, n_circuits, stats, shape="o", op_k=6, interval=0.999, 
-				ylim=[0.45,0.7], yticks=np.arange(0.4,0.75,0.05), 
-				font=style.font, clf="lr", path="", print_fig=True):
+def plot_scores_by_k(direction, n_circuits, stats, shape="o", op_k=6, interval=0.999, 
+					 ylim=[0.45,0.7], yticks=np.arange(0.4,0.75,0.05), poly_order=2, 
+					 font=style.font, clf="lr", path="", print_fig=True):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager, rcParams
@@ -340,37 +340,34 @@ def plot_scores(direction, n_circuits, stats, shape="o", op_k=6, interval=0.999,
 	fig = plt.figure(figsize=(4, 3))
 	ax = fig.add_axes([0,0,1,1])
 	font_prop = font_manager.FontProperties(fname=font, size=20)
+	rcParams["axes.linewidth"] = 1.5
+	xvals = [v-0.65 for v in n_circuits]
 
 	# Plot null distribution
 	null_lower, null_upper = load_confidence_interval(stats["null"], direction, n_circuits, interval=interval)
-	plt.fill_between(n_circuits, null_lower, null_upper, 
-					 alpha=0.2, color="gray")
-	plt.plot(n_circuits, np.mean(stats["null"][direction][:len(n_circuits)], axis=1), 
-			 linestyle="dashed", c="k", alpha=1, linewidth=2)
+	plt.fill_between(xvals, null_lower, null_upper, alpha=0.2, color="gray")
+	plt.plot(xvals, np.mean(stats["null"][direction][:len(n_circuits)], axis=1), 
+			 linestyle="dashed", c="black", alpha=0.5, linewidth=2)
 
 	# Plot bootstrap distribution
 	n_iter = float(stats["boot"][direction].shape[1])
 	boot_lower, boot_upper = load_confidence_interval(stats["boot"], direction, n_circuits, interval=interval)
-	for j, k in enumerate(n_circuits):
-		plt.plot([k, k], [boot_lower[j], boot_upper[j]], c="k", 
-				 linewidth=9, alpha=0.15)
+	plt.fill_between(xvals, boot_lower, boot_upper, alpha=0.2, color="gray")
 
 	# Plot observed values
-	plt.scatter(n_circuits, stats["scores"][direction][:len(n_circuits)], color="black", 
-				marker=shape, zorder=1000, s=45, alpha=0.3)
-	xp = np.linspace(n_circuits[0], n_circuits[-1], 100)
+	plt.scatter(xvals, stats["scores"][direction][:len(n_circuits)], color="black", 
+				marker=shape, zorder=1000, s=35, alpha=0.25, edgecolor="none")
+	xp = np.linspace(xvals[0], n_circuits[-1], 100)
 	idx = np.isfinite(stats["scores"][direction][:len(n_circuits)])
-	p = np.poly1d(np.polyfit(np.array(n_circuits)[idx], stats["scores"][direction][:len(n_circuits)][idx], 2))
-	plt.plot(xp, p(xp), zorder=0, linewidth=2, 
-			 color="black", alpha=1)
+	p = np.poly1d(np.polyfit(np.array(xvals)[idx], stats["scores"][direction][:len(n_circuits)][idx], poly_order))
+	plt.plot(xp, p(xp), zorder=0,  color="black", alpha=0.5, linewidth=2)
 
 	# Plot selected value
 	op_idx = list(n_circuits).index(op_k)
-	plt.scatter(n_circuits[op_idx]+0.03, stats["scores"][direction][:len(n_circuits)][op_idx]-0.00015, 
-				linewidth=2.5, edgecolor="black", color="none", 
-				marker=shape, s=70, zorder=100)
+	plt.scatter(xvals[op_idx], stats["scores"][direction][:len(n_circuits)][op_idx]-0.00015, 
+				linewidth=2, edgecolor="black", color="none", marker=shape, s=70, zorder=100)
 
-	plt.xlim([0,max(n_circuits)+1])
+	plt.xlim([0, max(n_circuits)])
 	plt.ylim(ylim)
 	plt.xticks(fontproperties=font_prop)
 	plt.yticks(yticks,fontproperties=font_prop)
@@ -381,9 +378,9 @@ def plot_scores(direction, n_circuits, stats, shape="o", op_k=6, interval=0.999,
 
 	n_iter = stats["boot"][direction].shape[1]
 	plt.savefig("{}figures/data-driven_{}_rocauc_{}_{}iter.png".format(path, clf, direction, n_iter), 
-				dpi=250, bbox_inches="tight")
+	            dpi=250, bbox_inches="tight")
 	if print_fig:
-	   plt.show()
+		plt.show()
 	plt.close()
 
 
@@ -396,22 +393,29 @@ def load_confidence_interval(distribution, direction, n_circuits, interval=0.999
 	return lower, upper
 
 
-def term_degree_centrality(i, lists, circuits, dtm, ids, reweight=False):
+def term_degree_centrality(i, lists, dtm, ids, reweight=False, term_col="TOKEN"):
 
-	terms = list(set(lists.loc[lists["CLUSTER"] == i, "TOKEN"]))
-	ttm = pd.DataFrame(np.matmul(dtm.loc[ids, terms].T, dtm.loc[ids, terms]), 
-					   index=terms, columns=terms)
+	terms = list(set(lists.loc[lists["CLUSTER"] == i, term_col]))
+	ttm = np.matmul(dtm.loc[ids, terms].values.T, dtm.loc[ids, terms].values)
+	ttm = pd.DataFrame(ttm, index=terms, columns=terms)
 	adj = pd.DataFrame(0, index=terms, columns=terms)
-	
+
 	for term_i in terms:
 		for term_j in terms:
 			adj.loc[term_i, term_j] = ttm.loc[term_i, term_j]
-	
+
 	degrees = adj.sum(axis=1)
 	degrees = degrees.loc[terms]
 	degrees = degrees.sort_values(ascending=False)
 
 	return degrees
+
+
+def nounify(word, form2noun):
+	if word in form2noun.keys():
+		return form2noun[word]
+	else: 
+		return word
 
 
 def export_ontology(lists, circuits, n_domains, ord_domains, clf, act, k2name, path=""):
@@ -441,36 +445,63 @@ def export_ontology(lists, circuits, n_domains, ord_domains, clf, act, k2name, p
 	return lists, circuit_mat
 
 
-def plot_wordclouds(framework, domains, lists, dtm, path="", 
-					font=style.font, print_fig=True, width=550):
-	
+def plot_wordclouds(framework, domains, lists, metric="SIMILARITY", palette=[],
+					path="figures/lists/", suffix="", min_font_size=0, max_font_size=60,
+					brightness_offset=0.15, darkness_offset=-0.35, n_offsets=25,
+                    font=style.font, print_fig=True, width=300, height=600):
+
+	import os
 	from wordcloud import WordCloud
 	import matplotlib.pyplot as plt
 
+	dir = "{}{}{}".format(path, framework, suffix)
+	if not os.path.exists(dir):
+	    os.makedirs(dir)
+
 	for i, dom in enumerate(domains):
-		
-		def color_func(word, font_size, position, orientation, 
-					   random_state=None, idx=0, **kwargs):
+
+		def color_func(word, font_size, position, orientation, random_state=42, idx=0,
+					   brightness_offset=brightness_offset, darkness_offset=darkness_offset,
+					   **kwargs):
 
 			# Adapted from https://amueller.github.io/word_cloud/auto_examples/a_new_hope.html
 
-			return style.palettes[framework][i]
+			hex = palette[i]
+			rgb_hex = [hex[x:x+2] for x in [1, 3, 5]]
+			rgb = [int(hex_value, 16) for hex_value in rgb_hex]
+			rgb = [min([255, max([0, i])]) / 255.0 for i in rgb]
+
+			colors = []
+			gradient = np.linspace(brightness_offset, darkness_offset, n_offsets)
+			for brightness_offset in gradient:
+				color = []
+				for rgb_value in rgb:
+					offset_value = int((rgb_value + brightness_offset) * 255)
+					offset_value = min([255, max([0, offset_value])])
+					color.append(offset_value)
+				colors.append(tuple(color))
+
+			index = int(len(colors) * font_size / (max_font_size - min_font_size))
+			index = min([max([index, 0]), len(colors) - 1])
+
+			return colors[index]
 
 		tkns = lists.loc[lists["DOMAIN"] == dom, "TOKEN"]
-		freq = dtm[tkns].sum().values
+		vals = lists.loc[lists["DOMAIN"] == dom, metric]
 		tkns = [t.replace("_", " ") for t in tkns]
+		tkn2val = {t: v for t, v in zip(tkns, vals)}
 
-		cloud = WordCloud(background_color="rgba(255, 255, 255, 0)", mode="RGB", 
-						  max_font_size=100, prefer_horizontal=1, scale=20, margin=3,
-						  width=width, height=15*len(tkns)+550, font_path=font, 
-						  random_state=42).generate_from_frequencies(zip(tkns, freq))
+		cloud = WordCloud(background_color="rgba(255, 255, 255, 0)", mode="RGBA", 
+						  min_font_size=min_font_size, max_font_size=max_font_size, 
+						  prefer_horizontal=1, scale=10, margin=3,
+						  width=width, height=height, font_path=font, 
+						  random_state=42).generate_from_frequencies(tkn2val)
 
 		fig = plt.figure()
 		plt.axis("off")
 		plt.imshow(cloud.recolor(color_func=color_func, random_state=42))
-		file_name = "{}figures/lists/{}_wordcloud_{}.png".format(path, framework, dom)
-		plt.savefig(file_name, 
-					dpi=800, bbox_inches="tight")
+		file_name = "{}/{}_wordcloud.png".format(dir, dom)
+		plt.savefig(file_name, dpi=400, bbox_inches="tight")
 		utilities.transparent_background(file_name)
 		if print_fig:
 			print(dom)
@@ -771,5 +802,36 @@ def load_framework_circuit(new, dtm_bin, act_bin, framework, n_iter=10000):
 		dom_links_thres = pd.read_csv(file, index_col=0, header=0)
 
 	return dom_links_thres
+
+def threshold_pmi_by_circuits(pmi, circuits, label_var="DOMAIN"):
+	for struct in pmi.index:
+		domain = circuits.loc[circuits["STRUCTURE"] == struct, label_var].values[0]
+		for column in pmi.columns:
+			if column != domain:
+				pmi.loc[struct, column] = 0.0
+	pmi = pmi.astype(float)
+	return pmi
+
+
+def threshold_pmi_by_fdr(pmi, act_bin, scores, n_iter=10000, fdr_thres=0.01, verbose=False):
+	
+	from statsmodels.stats.multitest import multipletests
+
+	pmi_null = compute_cooccurrences_null(act_bin, scores, n_iter=n_iter, verbose=verbose)
+	p = pd.DataFrame(index=act_bin.columns, columns=scores.columns)
+	
+	for i, struct in enumerate(act_bin.columns):
+		for j, dom in enumerate(scores.columns):
+			obs = pmi.values[i,j]
+			null = pmi_null[i,j,:]
+			p.loc[struct, dom] = np.sum(null > obs) / float(n_iter)
+	
+	fdr = multipletests(p.values.ravel(), method="fdr_bh")[1]
+	fdr = pd.DataFrame(fdr.reshape(p.shape), index=act_bin.columns, columns=scores.columns)
+	
+	pmi_thres = pmi[fdr < fdr_thres]
+	pmi_thres = pmi_thres.fillna(0.0)
+	
+	return pmi_thres
 
 

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+#SBATCH --job-name=k42r_ncircuits
+#SBATCH --output=logs/k42_ncircuits_reverse.%j.out
+#SBATCH --error=logs/k42_ncircuits_reverse.%j.err
+#SBATCH --time=00-02:00:00
+#SBATCH -p aetkin
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user=ebeam@stanford.edu
+
+module load python/3.6
+srun python3 listify_circuits_k42_reverse.py

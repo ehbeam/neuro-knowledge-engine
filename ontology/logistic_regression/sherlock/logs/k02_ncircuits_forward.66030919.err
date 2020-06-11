@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "listify_circuits_k02_forward.py", line 4, in <module>
+    listify_circuits.optimize_circuits(2, 'forward')
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/logistic_regression/sherlock/listify_circuits.py", line 101, in optimize_circuits
+    structure_features[i] = act_bin[structures].sum(axis=1)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/core/frame.py", line 2934, in __getitem__
+    raise_missing=True)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/core/indexing.py", line 1354, in _convert_to_indexer
+    return self._get_listlike_indexer(obj, axis, **kwargs)[1]
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/core/indexing.py", line 1161, in _get_listlike_indexer
+    raise_missing=raise_missing)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/core/indexing.py", line 1252, in _validate_read_indexer
+    raise KeyError("{} not in index".format(not_found))
+KeyError: "['left_cerebellum', 'right_cerebellum'] not in index"
+srun: error: sh02-02n10: task 0: Exited with exit code 1
+srun: Terminating job step 66030919.0

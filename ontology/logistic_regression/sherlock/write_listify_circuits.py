@@ -2,7 +2,7 @@
 
 import os, shutil
 
-for k in range(2, 26):
+for k in range(2, 51):
 
     for direction in ["forward", "reverse"]:
     
@@ -16,7 +16,7 @@ for k in range(2, 26):
                  "#SBATCH --job-name=k{:02d}{}_ncircuits".format(k, direction[0]),
                  "#SBATCH --output=logs/k{:02d}_ncircuits_{}.%j.out".format(k, direction),
                  "#SBATCH --error=logs/k{:02d}_ncircuits_{}.%j.err".format(k, direction),
-                 "#SBATCH --time=00-01:00:00",
+                 "#SBATCH --time=00-02:00:00",
                  "#SBATCH -p aetkin",
                  "#SBATCH --mail-type=FAIL",
                  "#SBATCH --mail-user=ebeam@stanford.edu\n",

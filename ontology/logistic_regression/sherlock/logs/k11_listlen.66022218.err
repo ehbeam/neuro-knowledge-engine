@@ -1,0 +1,27 @@
+/home/users/ebeam/.local/lib/python3.6/site-packages/pandas/core/indexing.py:1494: FutureWarning: 
+Passing list-likes to .loc or [] with any missing label will raise
+KeyError in the future, you can use .reindex() as an alternative.
+
+See the documentation here:
+https://pandas.pydata.org/pandas-docs/stable/indexing.html#deprecate-loc-reindex-listlike
+  return self._getitem_tuple(key)
+Traceback (most recent call last):
+  File "listify_length_k11.py", line 4, in <module>
+    listify_length.optimize_list_len(11)
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/logistic_regression/sherlock/listify_length.py", line 112, in optimize_list_len
+    op_val_f = optimize_hyperparameters(param_list, train_set_f, val_set_f, max_iter=max_iter)
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/logistic_regression/sherlock/listify_length.py", line 58, in optimize_hyperparameters
+    classifier.fit(train_set[0], train_set[1])
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/sklearn/multiclass.py", line 205, in fit
+    Y = self.label_binarizer_.fit_transform(y)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/sklearn/preprocessing/label.py", line 439, in fit_transform
+    return self.fit(y).transform(y)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/sklearn/preprocessing/label.py", line 408, in fit
+    self.y_type_ = type_of_target(y)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/sklearn/utils/multiclass.py", line 284, in type_of_target
+    _assert_all_finite(y)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/sklearn/utils/validation.py", line 56, in _assert_all_finite
+    raise ValueError(msg_err.format(type_err, X.dtype))
+ValueError: Input contains NaN, infinity or a value too large for dtype('float64').
+srun: error: sh02-02n10: task 0: Exited with exit code 1
+srun: Terminating job step 66022218.0

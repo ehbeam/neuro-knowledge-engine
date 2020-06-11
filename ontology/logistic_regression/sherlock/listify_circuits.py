@@ -49,7 +49,7 @@ def load_domains(k):
   return lists, circuits
 
 
-def optimize_hyperparameters(param_list, train_set, val_set, max_iter=100):
+def optimize_hyperparameters(param_list, train_set, val_set, max_iter=500):
   
   op_score_val, op_fit = 0, 0
   
@@ -80,7 +80,7 @@ def optimize_hyperparameters(param_list, train_set, val_set, max_iter=100):
   return op_fit
 
  
-def optimize_circuits(k, direction):
+def optimize_circuits(k, direction, max_iter=500):
   print("Assessing k={:02d} circuits".format(k))
 
   act_bin = load_coordinates()
@@ -114,7 +114,6 @@ def optimize_circuits(k, direction):
                 "C": [0.001, 0.01, 0.1, 1, 10, 100, 1000],
                 "fit_intercept": [True, False]}
   param_list = list(ParameterSampler(param_grid, n_iter=28, random_state=42))
-  max_iter = 1000
 
   if direction == "forward":
     file = "fits/forward_k{:02d}_{}.p".format(k, direction)

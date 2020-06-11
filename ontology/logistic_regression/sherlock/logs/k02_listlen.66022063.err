@@ -1,0 +1,3 @@
+slurmstepd: error: *** STEP 66022063.0 ON sh02-02n10 CANCELLED AT 2020-04-24T08:02:41 ***
+slurmstepd: error: *** JOB 66022063 ON sh02-02n10 CANCELLED AT 2020-04-24T08:02:41 ***
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.

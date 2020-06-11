@@ -61,29 +61,40 @@ def compute_distances(docs, metric="dice"):
 	from scipy.spatial.distance import cdist
 
 	dists = cdist(docs, docs, metric=metric)
-	dists = pd.DataFrame(dists, index=docs.index, columns=docs.index)	
+	dists = pd.DataFrame(dists, index=docs.index, columns=docs.index)
 	
 	return dists
 
 
-def plot_partition(framework, doc_dists, transitions, path="", print_fig=True):
+def plot_partition(framework, doc_dists, transitions, palette, figsize=(4,4), 
+				   linewidth=1.5, path="", suffix="", print_fig=True):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import cm, font_manager, rcParams
+	import matplotlib.patches as patches
 
-	rcParams["axes.linewidth"] = 1
+	rcParams["axes.linewidth"] = 1.5
 
-	fig = plt.figure(figsize=(10,10), frameon=False)
+	fig = plt.figure(figsize=figsize)
 	ax = fig.add_axes([0,0,1,1])
 
 	X = doc_dists.values.astype(np.float)
-	im = ax.matshow(X, cmap=cm.Greys_r, vmin=0, vmax=1, alpha=1) 
+	im = ax.matshow(X, cmap=cm.Greys_r, vmin=0, vmax=1, alpha=1)
+		
 	plt.xticks(transitions)
 	plt.yticks(transitions)
 	ax.set_xticklabels([])
 	ax.set_yticklabels([])
+	ax.xaxis.set_tick_params(width=1.5, length=7, top=False)
+	ax.yaxis.set_tick_params(width=1.5, length=7)
+	
+	for i, t in enumerate(transitions[:-1]):
+		t_next = transitions[i+1]
+		lines = [[t,t], [t,t_next], [t_next,t_next]]
+		ax.add_patch(patches.Polygon(lines, alpha=0.4, linewidth=3,
+									 facecolor=palette[i], edgecolor=palette[i]))
 
-	plt.savefig("{}figures/partition_{}.png".format(path, framework), 
+	plt.savefig("{}figures/partition_{}{}.png".format(path, framework, suffix), 
 				dpi=250, bbox_inches="tight")
 	if print_fig:
 		plt.show()

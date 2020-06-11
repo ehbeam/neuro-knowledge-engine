@@ -182,7 +182,7 @@ def compute_eval_null(stats, framework, direction, labels, pred_probs, preds, id
 		stats["null"][framework][direction]["f1"] = pd.read_csv(f1_file, index_col=0, header=0).values
 	else:
 		for n in range(n_iter):
-			samp = np.random.choice(range(len(ids)), size=len(ids), replace=True)
+			shuf = np.random.choice(range(len(ids)), size=len(ids), replace=True)
 			stats["null"][framework][direction]["f1"][:,n] = compute_eval_metric(labels[shuf,:], preds, f1_score)
 
 	return stats

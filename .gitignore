@@ -1,8 +1,5 @@
 # Ignore large files
-.gz
 corpus*txt
-dtm*txt
-glove*txt
 
 # Ignore code and data from outside sources
 CQHDimensionalPhenotyper.py

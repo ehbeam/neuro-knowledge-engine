@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "listify_length_k30.py", line 4, in <module>
+    listify_length.optimize_list_len(30)
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/neural_network/sherlock/listify_length.py", line 243, in optimize_list_len
+    # Optimize reverse inference classifier
+  File "/scratch/groups/aetkin/ebeam/neuro-knowledge-engine/ontology/neural_network/sherlock/listify_length.py", line 149, in optimize_hyperparameters
+    score_val = roc_auc_score(labels_val, preds_val, average="macro")
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/sklearn/metrics/ranking.py", line 355, in roc_auc_score
+    sample_weight=sample_weight)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/sklearn/metrics/base.py", line 119, in _average_binary_score
+    sample_weight=score_weight)
+  File "/home/users/ebeam/.local/lib/python3.6/site-packages/sklearn/metrics/ranking.py", line 323, in _binary_roc_auc_score
+    raise ValueError("Only one class present in y_true. ROC AUC score "
+ValueError: Only one class present in y_true. ROC AUC score is not defined in that case.
+srun: error: sh02-02n10: task 0: Exited with exit code 1
+srun: Terminating job step 66181400.0

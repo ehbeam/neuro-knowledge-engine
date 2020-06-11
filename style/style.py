@@ -1,33 +1,41 @@
 #!/usr/bin/python3
 
+# Order of domains for plotting
+order = {"data-driven": ["MEMORY", "REWARD", "COGNITION", 
+						 "VISION", "MANIPULATION", "LANGUAGE"],
+		 "rdoc": ["NEGATIVE_VALENCE", "POSITIVE_VALENCE", "AROUSAL_REGULATION", 
+				  "SOCIAL_PROCESSES", "COGNITIVE_SYSTEMS", "SENSORIMOTOR_SYSTEMS"],
+		 "dsm": ["DEPRESSIVE", "ANXIETY", "TRAUMA_STRESSOR", 
+		 		 "OBSESSIVE_COMPULSIVE", "DISRUPTIVE", "SUBSTANCE",
+		 		 "DEVELOPMENTAL", "PSYCHOTIC", "BIPOLAR"]}
 
-# Function to make custom linear colormaps
-def make_cmap(colors, position=None, bit=False, name="my_colormap"):
-	
+
+def make_cmap(hex, name="colormap"):
+
 	# Adapted from http://schubert.atmos.colostate.edu/~cslocum/custom_cmap.html
-	
+
 	import matplotlib as mpl
 	import numpy as np
 
+	if len(hex) != 7:
+		raise Exception("Pass a color in hex (#EAEAEA) format")
+
+	rgb_hex = [hex[x:x+2] for x in [1, 3, 5]]
+	rgb = [int(hex_value, 16) for hex_value in rgb_hex]
+	rgb = [min([255, max([0, i])]) / 255.0 for i in rgb]
+
+	colors = []
+	for brightness_offset in np.linspace(1,-0.7,18):
+		colors.append(tuple([rgb_value + brightness_offset for rgb_value in rgb]))
+
 	bit_rgb = np.linspace(0,1,256)
 
-	if position == None:
-		position = np.linspace(0,1,len(colors))
-	else:
-		if len(position) != len(colors):
-			sys.exit("position length must be the same as colors")
-		elif position[0] != 0 or position[-1] != 1:
-			sys.exit("position must start with 0 and end with 1")
-	if bit:
-		for i in range(len(colors)):
-			colors[i] = (bit_rgb[colors[i][0]],
-						 bit_rgb[colors[i][1]],
-						 bit_rgb[colors[i][2]])
-	cdict = {'red':[], 'green':[], 'blue':[]}
+	position = np.linspace(0,1,len(colors))
+	cdict = {"red":[], "green":[], "blue":[]}
 	for pos, color in zip(position, colors):
-		cdict['red'].append((pos, color[0], color[0]))
-		cdict['green'].append((pos, color[1], color[1]))
-		cdict['blue'].append((pos, color[2], color[2]))
+		cdict["red"].append((pos, color[0], color[0]))
+		cdict["green"].append((pos, color[1], color[1]))
+		cdict["blue"].append((pos, color[2], color[2]))
 
 	cmap = mpl.colors.LinearSegmentedColormap(name, cdict, 256)
 	return cmap
@@ -36,30 +44,21 @@ def make_cmap(colors, position=None, bit=False, name="my_colormap"):
 # Font for plotting
 font = "../style/Arial Unicode.ttf"
 
-# Custom colormaps
-cmaps = {"Yellows": make_cmap([(1,1,1), (0.937,0.749,0)]), 
-		 "Magentas": make_cmap([(1,1,1), (0.620,0,0.686)]), 
-		 "Purples": make_cmap([(1,1,1), (0.365,0,0.878)]),
-		 "Chartreuses": make_cmap([(1,1,1), (0.345,0.769,0)]),
-		 "Browns": make_cmap([(1,1,1), (0.82,0.502,0)])}
-
-# Color maps for plotting brains
-colormaps = {"data-driven": ["Blues", cmaps["Magentas"], cmaps["Yellows"], "Greens", "Reds", cmaps["Purples"]],
-			 "rdoc": ["Blues", "Reds", "Greens", cmaps["Purples"], cmaps["Yellows"], "Oranges"],
-			 "dsm": [cmaps["Purples"], cmaps["Chartreuses"], "Oranges", "Blues", "Reds", 
-			 cmaps["Magentas"], cmaps["Yellows"], "Greens", cmaps["Browns"]]}
-
 # Hex color mappings
-c = {"red": "#CE7D69", "orange": "#BA7E39", "yellow": "#CEBE6D", 
-	 "chartreuse": "#AEC87C", "green": "#77B58A", "blue": "#7597D0", 
-	 "magenta": "#B07EB6", "purple": "#7D74A3", "brown": "#846B43", "pink": "#CF7593"}
+c = {"magenta": "#AA436A", "red": "#CA4F52", "vermillion": "#C16137", "brown": "#AC835B", "orange": "#E8B586", 
+	 "gold": "#D19A17", "yellow": "#DCC447", "chartreuse": "#D9DC77", "lime": "#82B858", "green": "#43A971",
+	 "teal": "#48A4A8", "blue": "#5B81BD", "indigo": "#7275B9", "purple": "#924DA0", "lavendar": "#D599DD"}
 
-# Palettes for frameworks
-palettes = {"data-driven": [c["blue"], c["magenta"], c["yellow"], c["green"], c["red"], c["purple"], 
-							c["chartreuse"], c["orange"], c["pink"], c["brown"]],
-			"rdoc": [c["blue"], c["red"], c["green"], c["purple"], c["yellow"], c["orange"]],
-			"dsm": [c["purple"], c["chartreuse"], c["orange"], c["blue"], c["red"], c["magenta"], 
-					c["yellow"], c["green"], c["brown"]]}
+# Prespecified color order for each framework
+fw2c = {"data-driven": ["blue", "vermillion", "yellow", "purple", "green", "gold"],
+	    "rdoc": ["teal", "red", "chartreuse", "lavendar", "lime", "orange"],
+	    "dsm": ["teal", "red", "chartreuse", "lavendar", "lime", "orange", "indigo", "magenta", "brown"]}
+
+# Palettes for general plotting
+palettes = {fw: [c[color] for color in colors] for fw, colors in fw2c.items()}
+
+# Colormaps for plotting brains
+colormaps = {fw: [make_cmap(c[color], name=fw) for color in colors] for fw, colors in fw2c.items()}
 
 # Marker shapes for MDS plots
 shapes = ["o", "v", "^", ">", "<", "s", "X", "D", "p"]

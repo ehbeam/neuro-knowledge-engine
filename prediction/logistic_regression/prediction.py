@@ -45,22 +45,22 @@ def optimize_hyperparameters(param_list, train_set, val_set, max_iter=500):
 	return op_fit
 
 
-def train_classifier(framework, direction, suffix="", clf="", dtm_version=190325):
+def train_classifier(framework, direction, suffix="", clf="", dtm_version=190325, in_path="../", out_path=""):
 
-	fit_file = "fits/{}_{}.p".format(framework, direction)
+	fit_file = "{}fits/{}_{}.p".format(out_path, framework, direction)
 	if not os.path.isfile(fit_file):
 
 		# Load the data splits
 		splits = {}
 		for split in ["train", "validation"]:
-			splits[split] = [int(pmid.strip()) for pmid in open("../../data/splits/{}.txt".format(split), "r").readlines()]
+			splits[split] = [int(pmid.strip()) for pmid in open("{}../data/splits/{}.txt".format(in_path, split), "r").readlines()]
 
 		# Load the activation coordinate and text data
-		act_bin = utilities.load_coordinates(path="../../data")
-		dtm_bin = utilities.load_doc_term_matrix(version=dtm_version, binarize=True, path="../../data")
+		act_bin = utilities.load_coordinates(path="{}../data".format(in_path))
+		dtm_bin = utilities.load_doc_term_matrix(version=dtm_version, binarize=True, path="{}../data".format(in_path))
 		
 		# Score the texts using the framework
-		lists, circuits = utilities.load_framework(framework, suffix=suffix, clf=clf, path="../../ontology")
+		lists, circuits = utilities.load_framework(framework, suffix=suffix, clf=clf, path="{}../ontology".format(in_path))
 		scores = utilities.score_lists(lists, dtm_bin)
 			
 		# Specify the hyperparameters for the randomized grid search
@@ -86,9 +86,9 @@ def train_classifier(framework, direction, suffix="", clf="", dtm_version=190325
 		pickle.dump(op_fit, open(fit_file, "wb"), protocol=2)
 		
 
-train_classifier("data-driven", "forward", clf="_lr", dtm_version=190325)
-train_classifier("data-driven", "reverse", clf="_lr", dtm_version=190325)
-train_classifier("rdoc", "forward", suffix="_opsim", dtm_version=190325)
-train_classifier("rdoc", "reverse", suffix="_opsim", dtm_version=190325)
-train_classifier("dsm", "forward", suffix="_opsim", dtm_version=190325)
-train_classifier("dsm", "reverse", suffix="_opsim", dtm_version=190325)
+# train_classifier("data-driven", "forward", clf="_lr", dtm_version=190325)
+# train_classifier("data-driven", "reverse", clf="_lr", dtm_version=190325)
+# train_classifier("rdoc", "forward", suffix="_opsim", dtm_version=190325)
+# train_classifier("rdoc", "reverse", suffix="_opsim", dtm_version=190325)
+# train_classifier("dsm", "forward", suffix="_opsim", dtm_version=190325)
+# train_classifier("dsm", "reverse", suffix="_opsim", dtm_version=190325)

@@ -73,7 +73,7 @@ def optimize_hyperparameters(param_list, train_set, val_set, max_iter=100):
   return op_score_val
 
 
-def optimize_list_len(k):
+def optimize_list_len(k, max_iter=100):
 
     # Load the data splits
     splits = {}
@@ -90,8 +90,7 @@ def optimize_list_len(k):
                   "C": [0.001, 0.01, 0.1, 1, 10, 100, 1000],
                   "fit_intercept": [True, False]}
     param_list = list(ParameterSampler(param_grid, n_iter=28, random_state=42))
-    max_iter = 1000
-
+    
     list_lens = range(5, 26)
     op_lists = pd.DataFrame()
     
@@ -110,13 +109,19 @@ def optimize_list_len(k):
             # Optimize forward inference classifier 
             train_set_f = [dtm_bin.loc[splits["train"], words], act_bin.loc[splits["train"], structures]]
             val_set_f = [dtm_bin.loc[splits["validation"], words], act_bin.loc[splits["validation"], structures]]
-            op_val_f = optimize_hyperparameters(param_list, train_set_f, val_set_f, max_iter=max_iter)
+            try:
+              op_val_f = optimize_hyperparameters(param_list, train_set_f, val_set_f, max_iter=max_iter)
+            except:
+              op_val_f = 0.0
             forward_scores.append(op_val_f)
 
             # Optimize reverse inference classifier
             train_set_r = [act_bin.loc[splits["train"], structures], dtm_bin.loc[splits["train"], words]]
             val_set_r = [act_bin.loc[splits["validation"], structures], dtm_bin.loc[splits["validation"], words]]
-            op_val_r = optimize_hyperparameters(param_list, train_set_r, val_set_r, max_iter=max_iter)
+            try:
+              op_val_r = optimize_hyperparameters(param_list, train_set_r, val_set_r, max_iter=max_iter)
+            except:
+              op_val_r = 0.0
             reverse_scores.append(op_val_r)
         
         scores = [(forward_scores[i] + reverse_scores[i])/2.0 for i in range(len(forward_scores))]

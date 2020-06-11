@@ -15,7 +15,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import ParameterSampler
 
 import sys
-sys.path.append("../..")
+sys.path.append("../../..")
 import utilities
 
 
@@ -185,14 +185,14 @@ def train_classifier(framework, direction, suffix="", clf="", dtm_version=190325
 	# Load the data splits
 	splits = {}
 	for split in ["train", "validation"]:
-		splits[split] = [int(pmid.strip()) for pmid in open("../../data/splits/{}.txt".format(split), "r").readlines()]
+		splits[split] = [int(pmid.strip()) for pmid in open("../../../data/splits/{}.txt".format(split), "r").readlines()]
 
 	# Load the activation coordinate and text data
-	act_bin = utilities.load_coordinates(path="../../data")
-	dtm_bin = utilities.load_doc_term_matrix(version=dtm_version, binarize=True, path="../../data")
+	act_bin = utilities.load_coordinates(path="../../../data")
+	dtm_bin = utilities.load_doc_term_matrix(version=dtm_version, binarize=True, path="../../../data")
 	
 	# Score the texts using the framework
-	lists, circuits = utilities.load_framework(framework, suffix=suffix, clf=clf, path="../../ontology")
+	lists, circuits = utilities.load_framework(framework, suffix=suffix, clf=clf, path="../../../ontology")
 	scores = utilities.score_lists(lists, dtm_bin)
 		
 	# If hyperparameters have already been optimizd, use them

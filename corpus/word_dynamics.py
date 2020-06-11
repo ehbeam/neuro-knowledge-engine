@@ -168,26 +168,29 @@ dir = "../../nlp/corpus"
 
 # General neuroimaging corpus
 print("\nPlotting words in general neuroimaging corpus")
+# year2pmids = load_data_from_records("../../pubmed/query_190428/records")
 year2pmids = load_data_from_records("../../pubmed/query_190428/records")
-freq = extract_freq_by_year(words, year2pmids, [dir])
-boot = boot_freq_by_year(words, year2pmids, [dir], 
-					  	 n_iter=1000, seed=42, verbose=True)
-plot_freq_over_years(freq, "gen_words_by_year", freq_boot=boot, plot_boot=True)
 
-# Psychiatric neuroimaging corpus
-print("\nPlotting words in psychiatric neuroimaging corpus")
-year2pmids = load_data_from_records("../../dsm/query_190428/records")
-freq = extract_freq_by_year(words, year2pmids, [dir, "../../dsm/corpus"])
-boot = boot_freq_by_year(words, year2pmids, [dir, "../../dsm/corpus"], 
-					  	 n_iter=1000, seed=42, verbose=True)
-plot_freq_over_years(freq, "psy_words_by_year", freq_boot=boot, plot_boot=True)
+print(year2pmids.keys())
+# freq = extract_freq_by_year(words, year2pmids, [dir])
+# boot = boot_freq_by_year(words, year2pmids, [dir], 
+# 					  	 n_iter=1000, seed=42, verbose=True)
+# plot_freq_over_years(freq, "gen_words_by_year", freq_boot=boot, plot_boot=True)
 
-# Articles with coordinate data
-print("\nPlotting words in neuroimaging corpus with coordinates")
-year2pmids = load_data_from_meta("../data/metadata.csv")
-freq = extract_freq_by_year(words, year2pmids, [dir])
-boot = boot_freq_by_year(words, year2pmids, [dir], 
-					  	 n_iter=1000, seed=42, verbose=True)
-plot_freq_over_years(freq, "cog_words_by_year", freq_boot=boot, plot_boot=True)
+# # Psychiatric neuroimaging corpus
+# print("\nPlotting words in psychiatric neuroimaging corpus")
+# year2pmids = load_data_from_records("../../dsm/query_190428/records")
+# freq = extract_freq_by_year(words, year2pmids, [dir, "../../dsm/corpus"])
+# boot = boot_freq_by_year(words, year2pmids, [dir, "../../dsm/corpus"], 
+# 					  	 n_iter=1000, seed=42, verbose=True)
+# plot_freq_over_years(freq, "psy_words_by_year", freq_boot=boot, plot_boot=True)
+
+# # Articles with coordinate data
+# print("\nPlotting words in neuroimaging corpus with coordinates")
+# year2pmids = load_data_from_meta("../data/metadata.csv")
+# freq = extract_freq_by_year(words, year2pmids, [dir])
+# boot = boot_freq_by_year(words, year2pmids, [dir], 
+# 					  	 n_iter=1000, seed=42, verbose=True)
+# plot_freq_over_years(freq, "cog_words_by_year", freq_boot=boot, plot_boot=True)
 
 

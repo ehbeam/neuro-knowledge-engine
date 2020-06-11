@@ -2,7 +2,7 @@
 
 import os, shutil
 
-for k in range(2, 26):
+for k in range(2, 51):
     
     comm = "listify_length.optimize_list_len({})".format(k)
     pyfile = open("listify_length_k{:02d}.py".format(k), "w+")

@@ -2,7 +2,7 @@
 
 import os, shutil
 
-for k in range(2, 26):
+for k in range(2, 51):
 
     for direction in ["forward", "reverse"]:
     
