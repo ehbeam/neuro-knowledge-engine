@@ -1,0 +1,4 @@
+((positron emission tomography) OR "fmri") AND (psychiat* OR psychol* OR mental OR emotion* OR reward* OR cognit* OR social* OR arous*) NOT (cancer OR tumor OR stroke OR hematoma OR hemorrhage OR aneurysm OR encephalitis OR infection)
+
+Species: human
+Type: journal article 
