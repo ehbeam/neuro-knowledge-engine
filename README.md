@@ -49,7 +49,7 @@ Codebase for a manuscript in preparation by Elizabeth Beam, Christopher Potts, R
 | 9g, 10h-j, 11g-i | prediction/comp\_frameworks\_lr.ipynb                                                                                 |
 | 12b, e; 13a, d; 14b, e; 15a, d | prediction/pred\_data-driven_nn.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py |
 | 12c, f; 13b, e; 14c, f; 15b, e | prediction/pred\_rdoc.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py |
-| 12d, g; 13c, f; 14d, g; 15c, f   | prediction/pred\_dsm.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py |
+| 12d, g; 13c, f; 14d, g; 15c, f | prediction/pred\_dsm.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py |
 | 12h, 13g, 14h-j, 15g-i | prediction/comp\_frameworks\_nn.ipynb                                                                           |
 | 16-18    | prediction/table\_lr-nn.ipynb                                                                                                 |
 | 19a      | partition/part\_data-driven\_lr.ipynb, partition/partition.py                                                                 |

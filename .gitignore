@@ -1,5 +1,6 @@
 # Ignore large files
 corpus*txt
+data/text/glove*txt
 
 # Ignore code and data from outside sources
 CQHDimensionalPhenotyper.py
@@ -12,6 +13,7 @@ in_progress/
 archive/
 
 # Ignore byte code
-.pyc
-__pycache__/
-.ipynb_checkpoints/
+**/__pycache__/
+**/.pyc
+**/.DS_Store
+**/.ipynb_checkpoints/

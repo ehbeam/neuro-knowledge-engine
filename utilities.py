@@ -216,18 +216,28 @@ def map_plane(estimates, atlas, path, suffix="", plane="z", cut_coords=1, cbar=F
 			  vmin=0.0, vmaxs=[], cmaps=[], print_fig=True, verbose=False):
 	
 	from nilearn import image, plotting
+
+	if len(vmaxs) < len(estimates.columns):
+		vmaxs = [round(v, 2) for v in estimates.max()]
 	
 	for f, feature in enumerate(estimates.columns):
+		
 		stat_map = image.copy_img(atlas).get_data()
 		data = estimates[feature]
+		
 		if verbose:
 			print("{:20s} Min: {:6.4f}  Mean: {:6.4f}  Max: {:6.4f}".format(
 				  feature, min(data), np.mean(data), max(data)))
 		if not verbose and print_fig:
 			print("\n{}".format(feature))
+		
 		for i, value in enumerate(data):
 			stat_map[stat_map == i+1] = value
 		stat_map = image.new_img_like(atlas, stat_map)
+		
+		if plane == "ortho":
+			cut_coords = None
+		
 		display = plotting.plot_stat_map(stat_map,
 										 display_mode=plane, cut_coords=cut_coords,
 										 symmetric_cbar=False, colorbar=cbar,
@@ -272,18 +282,19 @@ def compare_to_null(df_null, df, n_iter, alpha=0.001):
 		pval.append(p)
 		df.loc[dom, "P"] = p
 	df["FDR"] = multipletests(pval, method="fdr_bh")[1]
+
 	return df
 
 
-def compare_bootstraps(stats, frameworks, n_iter=1000):
+def compare_split_bootstraps(stats, frameworks, split, n_iter=1000):
 
 	from statsmodels.stats.multitest import multipletests
 
 	p = np.empty((len(frameworks), len(frameworks)))
 	for i, fw_i in enumerate(frameworks):
 		for j, fw_j in enumerate(frameworks):
-			boot_i = np.mean(stats["boot"][fw_i], axis=0)
-			boot_j = np.mean(stats["boot"][fw_j], axis=0)
+			boot_i = np.mean(stats["boot"][fw_i][split], axis=0)
+			boot_j = np.mean(stats["boot"][fw_j][split], axis=0)
 			p[i,j] = np.sum((boot_i - boot_j) <= 0.0) / float(n_iter)
 	fdr = multipletests(p.ravel(), method="fdr_bh")[1].reshape(p.shape)
 	fdr = pd.DataFrame(fdr, index=frameworks, columns=frameworks)
@@ -291,24 +302,37 @@ def compare_bootstraps(stats, frameworks, n_iter=1000):
 	return fdr
 
 
-def load_stat_file(stats, stat_name, metric, stat, framework, suffix="", path=""):
+def load_stat_file(stats, stat_name, metric, framework, split, suffix="", path=""):
 	
 	file = "{}data/{}_{}_{}{}.csv".format(path, metric, stat_name, framework, suffix)
-	stats[stat_name][framework] = pd.read_csv(file, index_col=0, header=0)
+	stats[stat_name][framework][split] = pd.read_csv(file, index_col=0, header=0)
 	
 	return stats
 
 
-def load_partition_stats(stats, metric, framework, lists, dom2docs, n_iter=1000, alpha=0.001, clf="", path=""):
+def interleave_null(df_null):
 
-	stat_names = ["obs", "mean", "null", "boot"]
-	iter_suffixes = ["", "", "_{}iter".format(n_iter), "_{}iter".format(n_iter)]
+	df_null_interleaved = pd.DataFrame()
+	null_idx = []
+	for dom in df_null["discovery"].index:
+		for split in ["discovery", "replication"]:
+			df_null_interleaved = df_null_interleaved.append(df_null[split].loc[dom])
+			null_idx.append(dom + "_" + split)
+	df_null_interleaved.index = null_idx
+
+	return df_null_interleaved
+
+
+def load_partition_stats(stats, metric, framework, split, lists, dom2docs, n_iter=1000, alpha=0.001, clf="", path=""):
+
+	stat_names = ["mean", "null", "boot"]
+	iter_suffixes = ["", "_{}iter".format(n_iter), "_{}iter".format(n_iter)]
 
 	for stat_name, iter_suffix in zip(stat_names, iter_suffixes):
-		suffix = clf + iter_suffix
-		stats = load_stat_file(stats, stat_name, metric, stat_name, framework, suffix=suffix, path=path)
+		suffix = clf + "_" + split + iter_suffix
+		stats = load_stat_file(stats, stat_name, metric, framework, split, suffix=suffix, path=path)
 
-	stats["null_comparison"][framework] = compare_to_null(stats["null"][framework], stats["mean"][framework], n_iter, alpha=alpha)
+	stats["null_comparison"][framework][split] = compare_to_null(stats["null"][framework][split], stats["mean"][framework][split], n_iter, alpha=alpha)
 
 	return stats
 
@@ -454,12 +478,20 @@ def plot_split_violins(framework, domains, df_obs, df_null, df_stat, palette, me
 	plt.close()
 
 
+def sort_partition_stats(stats, split):
+
+	mean = {framework: stats["mean"][framework][split] for framework in stats["mean"].keys()}
+	null = {framework: stats["null"][framework][split] for framework in stats["null"].keys()}
+	boot = {framework: stats["boot"][framework][split] for framework in stats["boot"].keys()}
+
+	return mean, null, boot
+	
+
 def plot_framework_comparison(boot, obs, mean, n_iter=1000, print_fig=True, font=style.font, dx=0.38, 
 							  ylim=[0.4,0.65], yticks=[], metric="mod", suffix="", path=""):
 
 	import matplotlib.pyplot as plt
 	from matplotlib import font_manager, rcParams
-	
 
 	font_lg = font_manager.FontProperties(fname=font, size=20)
 	rcParams["axes.linewidth"] = 1.5

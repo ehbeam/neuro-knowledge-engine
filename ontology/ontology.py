@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 
 import os, sklearn
 import pandas as pd
@@ -331,7 +330,7 @@ def compute_eval_stats(clf, directions, n_circuits, features, fits, ids,
 
 
 def plot_scores_by_k(direction, n_circuits, stats, shape="o", op_k=6, interval=0.999, 
-					 ylim=[0.45,0.7], yticks=np.arange(0.4,0.75,0.05), poly_order=2, 
+					 ylim=[0.4,0.7], yticks=np.arange(0.4,0.75,0.05), poly_order=2, 
 					 font=style.font, clf="lr", path="", print_fig=True):
 
 	import matplotlib.pyplot as plt
@@ -418,6 +417,38 @@ def nounify(word, form2noun):
 		return word
 
 
+def name_domains(lists, dtm_bin, path="../"):
+    
+    k = len(set(lists["CLUSTER"]))
+    k2terms = {i: list(set(lists.loc[lists["CLUSTER"] == i+1, "TOKEN"])) for i in range(k)}
+    k2name = {i+1: "" for i in range(k)}
+    names, degs = [""]*k, [0]*k
+    
+    while "" in names:
+        for i in range(k):
+            
+            degrees = term_degree_centrality(i+1, lists, dtm_bin, dtm_bin.index)
+            degrees = degrees.loc[k2terms[i]].sort_values(ascending=False)
+            name = degrees.index[0].upper()
+            
+            if name not in names:
+                names[i] = name
+                degs[i] = max(degrees)
+                k2name[i+1] = name
+            
+            elif name in names:
+                name_idx = names.index(name)
+                if degs[name_idx] > degs[i]:
+                    k2terms[i] = [term for term in k2terms[i] if term != name.lower()]
+    
+    title_df = pd.read_csv("{}lexicon/labels_cogneuro.csv".format(path), index_col=None, header=0)
+    term2title = {term.upper(): title.upper().replace(" ", "_") for term, title in zip(title_df["TERM"], title_df["TITLE"])}
+
+    k2name = {k: nounify(name, term2title) for k, name in k2name.items()}
+    
+    return k2name
+
+
 def export_ontology(lists, circuits, n_domains, ord_domains, clf, act, k2name, path=""):
 
 	names = [k2name[k] for k in ord_domains]
@@ -442,7 +473,7 @@ def export_ontology(lists, circuits, n_domains, ord_domains, clf, act, k2name, p
 			circuit_mat.loc[structure, name] = 1.0
 	circuit_mat.to_csv("{}circuits/circuits_data-driven_{}.csv".format(path, clf))
 
-	return lists, circuit_mat
+	return lists, circuits
 
 
 def plot_wordclouds(framework, domains, lists, metric="SIMILARITY", palette=[],
@@ -521,6 +552,7 @@ def load_rdoc_lists(lexicon, vsm, seeds, dtm, n_terms=range(5,26), path="", verb
 	for l, dom in enumerate(doms):
 		dom_df = seeds.loc[seeds["DOMAIN"] == dom]
 		tokens = list(dom_df["TOKEN"])
+		tokens = [tkn for tkn in tokens if tkn in vsm.index]
 		centroid = np.mean(vsm.loc[tokens]).values.reshape(1, -1)
 		dists = cdist(vsm.loc[lexicon], centroid, metric="cosine")
 		dists = pd.Series(dists.reshape(-1), index=lexicon).sort_values()
@@ -538,14 +570,17 @@ def load_rdoc_lists(lexicon, vsm, seeds, dtm, n_terms=range(5,26), path="", verb
 				   "TOKEN": [w],
 				   "SOURCE": ["RDoC" if w in tokens else "Lexicon"],
 				   "DISTANCE": [d]}
-			lists = lists.append(pd.DataFrame(dic))
+			lists = lists.append(pd.DataFrame(dic), sort=True)
 	
-	lists = lists[["ORDER", "DOMAIN", "TOKEN", "SOURCE", "DISTANCE"]]
+	lists["SIMILARITY"] = 1.0 - lists["DISTANCE"]
+	lists = lists[["ORDER", "DOMAIN", "TOKEN", "SOURCE", "DISTANCE", "SIMILARITY"]]
 	lists = lists.sort_values(["ORDER", "DISTANCE"])
 	lists = lists.loc[lists["TOKEN"].isin(dtm.columns)]
 	lists.to_csv("{}lists/lists_rdoc.csv".format(path), index=None)
+	
 	op_df = load_optimized_lists(doms, lists, n_terms, seeds, vsm)
 	op_df.to_csv("{}data/df_rdoc_opsim.csv".format(path))
+	
 	lists = update_lists(doms, op_df, lists, "rdoc", path=path)
 
 	return lists
@@ -589,7 +624,8 @@ def load_dsm_lists(lexicon, vsm, seeds, n_terms=range(5, 26), path="", verbose=F
 				   "DISTANCE": [d]}
 			lists = lists.append(pd.DataFrame(dic))
 	
-	lists = lists[["ORDER", "DOMAIN", "TOKEN", "SOURCE", "DISTANCE"]]
+	lists["SIMILARITY"] = 1.0 - lists["DISTANCE"]
+	lists = lists[["ORDER", "DOMAIN", "TOKEN", "SOURCE", "DISTANCE", "SIMILARITY"]]
 	lists = lists.sort_values(["ORDER", "DISTANCE"])
 	lists.to_csv("{}lists/lists_dsm.csv".format(path), index=None)
 
@@ -608,6 +644,7 @@ def load_optimized_lists(doms, lists, list_lens, seed_df, vsm):
 	op_df = pd.DataFrame(index=doms, columns=list_lens)
 	for dom in doms:
 		seed_tkns = seed_df.loc[seed_df["DOMAIN"] == dom, "TOKEN"]
+		seed_tkns = [tkn for tkn in seed_tkns if tkn in vsm.index]
 		seed_centroid = np.mean(vsm.loc[seed_tkns])
 		for list_len in list_lens:
 			len_tkns = lists.loc[lists["DOMAIN"] == dom, "TOKEN"][:list_len]

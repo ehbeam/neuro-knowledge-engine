@@ -134,4 +134,4 @@ def optimize_list_len(k, max_iter=100):
         op_df["ROC_AUC"] = max(scores)
         op_lists = op_lists.append(op_df)
 
-    op_lists.to_csv("../../lists/lists_k{:02d}_oplen_logreg.csv".format(k), index=None)
+    op_lists.to_csv("../../lists/lists_k{:02d}_oplen_lr.csv".format(k), index=None)

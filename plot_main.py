@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 
-"""plot_main.py: Generates plots in the main text of 'A computational knowledge engine for human neuroscience.'"""
+"""plot_main.py: Generates plots in the main text of 'A computational knowledge engine for human neuroscience'"""
 
-__author__      = "Elizabeth Beam"
+__author__	  = "Elizabeth Beam"
 __email__ 		= "ebeam@stanford.edu"
-__copyright__   = "Copyright 2019, Elizabeth Beam"
-__license__     = "MIT"
+__copyright__   = "Copyright 2020, Elizabeth Beam"
+__license__	 = "MIT"
 __version__		= "1.0.0"
 
 
@@ -36,10 +36,10 @@ parser.add_argument("--v_vsm", type=int, default=190428, help="Version of GloVe 
 parser.add_argument("--v_dtm", type=int, default=190325, help="Version of document-term matrix (YYMMDD)")
 parser.add_argument("--v_rdoc", type=int, default=190124, help="Version of RDoC matrix (YYMMDD)")
 parser.add_argument("--clf", type=str, default="lr", help="Classification architecture ('lr' for logistic regression, 'nn' for neural network)")
-parser.add_argument("--n_circuits", default=range(2,26), help="Range for number of data-driven circuits to generate")
+parser.add_argument("--n_circuits", default=range(2,51), help="Range for number of data-driven circuits to generate")
 parser.add_argument("--n_terms", default=range(5,26), help="Range of number of terms per data-driven domains")
 parser.add_argument("--n_domains", type=int, default=6, help="Number of domains selected for the data-driven ontology")
-parser.add_argument("--ord_domains", type=list, default=[3,6,5,4,2,1], help="Order for the selected domains in the data-driven ontology")
+parser.add_argument("--ord_domains", type=list, default=[6,4,5,1,3,2], help="Order for the selected domains in the data-driven ontology")
 parser.add_argument("--n_iter", type=int, default=1000, help="Number of iterations for bootstrap and null distributions")
 parser.add_argument("--n_iter_fw", type=int, default=10000, help="Number of iterations for RDoC and DSM framework generation analyses")
 parser.add_argument("--ci", type=float, default=0.999, help="Confidence interval for plotting distributions")
@@ -61,7 +61,7 @@ data_path = "data"
 frameworks = ["data-driven", "rdoc", "dsm"] # Frameworks to analyze
 titles = {"data-driven": "data-driven", "rdoc": "RDoC", "dsm": "DSM"} # For printing and plotting
 suffixes = {"data-driven": "", "rdoc": "_opsim", "dsm": "_opsim"} # For framework files 
-clfs = {"data-driven": "_"+args.clf, "rdoc": "", "dsm": ""} # Classifier used to generate framework
+clfs = {"data-driven": "_" + args.clf, "rdoc": "", "dsm": ""} # Classifier used to generate framework
 clf2name = {"lr": "logistic_regression", "nn": "neural_network"} # Full names for classification architectures
 directions = ["forward", "reverse"] # Directions for classification
 
@@ -116,22 +116,20 @@ for k in args.n_circuits:
 
 # Evaluate the classifiers used to select the optimal number of domains
 fits = ontology.load_fits(args.clf, directions, args.n_circuits, path=ontol_path)
-features = ontology.load_domain_features(dtm, act, directions, args.n_circuits, suffix="_"+args.clf, path=ontol_path)
-stats = ontology.compute_eval_stats(args.clf, directions, args.n_circuits, features, fits, splits["validation"], 
-									n_iter=args.n_iter, path=ontol_path)
+features = ontology.load_domain_features(dtm, act, directions, args.n_circuits, 
+										 suffix="_" + args.clf, path=ontol_path)
+stats = ontology.compute_eval_stats(args.clf, directions, args.n_circuits, features, fits, 
+									splits["validation"], n_iter=args.n_iter, path=ontol_path)
 
 # Plot evaluation metrics
 for direction, shape in zip(directions+["mean"], [">", "<", "D"]):
-	ontology.plot_scores(direction, args.n_circuits, stats, shape=shape, op_k=args.n_domains, interval=args.ci, 
-						 font=args.font, path=ontol_path, clf=args.clf, print_fig=False)
+	ontology.plot_scores_by_k(direction, args.n_circuits, stats, shape=shape, op_k=args.n_domains, 
+							  interval=args.ci, font=args.font, path=ontol_path, clf=args.clf, print_fig=False)
 
 # Name the domains
-k2name = {}
-lists, circuits = ontology.load_ontology(args.n_domains, path=ontol_path, suffix="_"+args.clf)
-for k in range(args.n_domains):
-	degrees = ontology.term_degree_centrality(k+1, lists, circuits, dtm, splits["train"])
-	name = degrees.index[0].upper()
-	k2name[k+1] = name
+lists, circuits = ontology.load_ontology(args.n_domains, path=ontol_path, suffix="_" + args.clf)
+k2name = ontology.name_domains(lists, dtm, path="")
+names = [k2name[k] for k in args.ord_domains]
 
 # Export the named domains
 lists, circuits = ontology.export_ontology(lists, circuits, args.n_domains, args.ord_domains, args.clf, 
@@ -139,15 +137,19 @@ lists, circuits = ontology.export_ontology(lists, circuits, args.n_domains, args
 
 # Plot the term lists
 print("\n------ Plotting word clouds")
-doms_dd = [k2name[k] for k in args.ord_domains]
-ontology.plot_wordclouds("data-driven", doms_dd, lists, dtm[lexicon], width=600,
-						 font=args.font, path=ontol_path, print_fig=False)
+ontology.plot_wordclouds("data-driven", names, lists, metric="R", path="{}figures/lists/".format(ontol_path),
+						 suffix="_" + args.clf, palette=style.palettes["data-driven"], height=350, width=260, 
+						 min_font_size=0, max_font_size=50, n_offsets=25,
+						 brightness_offset=0.15, darkness_offset=-0.35, print_fig=False)
 
 # Plot the brain circuits
 print("\n------ Plotting circuit maps")
-utilities.map_plane(circuits, atlas, "{}figures/circuits/data-driven_{}".format(ontol_path, args.clf), 
+scores = utilities.score_lists(lists, dtm, label_var="DOMAIN").loc[act.index]
+pmi = ontology.compute_cooccurrences(act, scores, positive=True)
+pmi = ontology.threshold_pmi_by_circuits(pmi, circuits)
+utilities.map_plane(pmi, atlas, "{}figures/circuits/data-driven_{}".format(ontol_path, args.clf), 
 		  			plane="z", cmaps=style.colormaps["data-driven"], cbar=True, 
-		  			vmin=0.0, vmax=2.0, annotate=True, suffix="_z", verbose=False, print_fig=False)
+		  			suffix="_z", verbose=False, print_fig=False)
 
 
 ################################################
@@ -170,7 +172,7 @@ vsm_rdoc = pd.read_csv("{}/text/glove_gen_n100_win15_min5_iter500_{}.txt".format
 # Load the seed terms and domains from the RDoC matrix
 seeds_rdoc = pd.read_csv("lexicon/rdoc_{}/rdoc_seeds.csv".format(args.v_rdoc), index_col=None, header=0)
 seeds_rdoc = seeds_rdoc.loc[seeds_rdoc["TOKEN"].isin(vsm_rdoc.index)]
-doms_rdoc = list(collections.OrderedDict.fromkeys(seeds_rdoc["DOMAIN"]))
+doms_rdoc = style.order["rdoc"]
 
 # Add RDoC seeds to the lexicon and filter out terms that did not occur in the DTM or VSM
 lex_rdoc = set(lexicon).union(seeds_rdoc["TOKEN"])
@@ -187,15 +189,17 @@ ontology.plot_rdoc_similarity(doms_rdoc, stats, font=args.font, path=ontol_path)
 
 # Plot the term lists
 print("\n------ Plotting word clouds")
-ontology.plot_wordclouds("rdoc", doms_rdoc, lists_rdoc, dtm, 
-						 font=args.font, print_fig=False, path=ontol_path)
+ontology.plot_wordclouds("rdoc", doms_rdoc, lists_rdoc, path="{}figures/lists/".format(ontol_path),
+						 metric="SIMILARITY", palette=style.palettes["rdoc"], height=350, width=260, 
+						 min_font_size=0, max_font_size=50, n_offsets=25,
+						 brightness_offset=0.15, darkness_offset=-0.35, print_fig=False)
 
 # Plot the brain circuits
 print("\n------ Plotting circuit maps")
 circuits_rdoc = ontology.load_framework_circuit(lists_rdoc, dtm, act, "rdoc")
 utilities.map_plane(circuits_rdoc, atlas, "{}figures/circuits/rdoc".format(ontol_path), 
-	  				cmaps=style.colormaps["rdoc"], plane="z", cbar=True, vmin=0.0, vmax=0.6,
-	  				annotate=True, suffix="_z", verbose=False, print_fig=False)
+	  				cmaps=style.colormaps["rdoc"], plane="z", cbar=True, cut_coords=None,
+	  				suffix="_z", verbose=False, print_fig=False)
 
 
 ###### DSM ######
@@ -207,7 +211,7 @@ vsm_dsm = pd.read_csv("{}/text/glove_psy_n100_win15_min5_iter500_{}.txt".format(
 
 # Load the seed terms and domains from the DSM-5
 seeds_dsm = pd.read_csv("{}/text/seeds_dsm5.csv".format(data_path), index_col=None, header=0)
-doms_dsm = list(collections.OrderedDict.fromkeys(seeds_dsm["DOMAIN"]))
+doms_dsm = style.order["dsm"]
 
 # Load the lexicon of psychiatric terms and filter out terms that did not occur in the DTM or VSM
 lex_dsm = utilities.load_lexicon(["cogneuro", "dsm", "psychiatry"], path="lexicon")
@@ -231,15 +235,17 @@ lists_dsm.to_csv("{}lists/lists_dsm_opsim.csv".format(ontol_path), index=None)
 
 # Plot the term lists
 print("\n------ Plotting word clouds")
-ontology.plot_wordclouds("dsm", doms_dsm_filt, lists_dsm, dtm,
-						 path=ontol_path, font=args.font, print_fig=False)
+ontology.plot_wordclouds("dsm", doms_dsm, lists_dsm, path="{}figures/lists/".format(ontol_path),
+						 metric="SIMILARITY", palette=style.palettes["dsm"], height=350, width=260, 
+						 min_font_size=0, max_font_size=50, n_offsets=25,
+						 brightness_offset=0.15, darkness_offset=-0.35,  print_fig=False)
 
 # Plot the brain circuits
 print("\n------ Plotting circuit maps")
 circuits_dsm = ontology.load_framework_circuit(lists_dsm, dtm, act, "dsm")
 utilities.map_plane(circuits_dsm, atlas, "{}figures/circuits/dsm".format(ontol_path), 
-	  				cmaps=style.colormaps["dsm"], plane="z", cbar=True, vmin=0.0, vmax=0.6,
-	  				annotate=True, suffix="_z", verbose=False, print_fig=False)
+	  				cmaps=style.colormaps["dsm"], plane="z", cbar=True, cut_coords=None,
+	  				suffix="_z", verbose=False, print_fig=False)
 
 
 ################################################
@@ -263,7 +269,8 @@ struct_labels = struct_labels.loc[act.columns, "ABBREVIATION"].values
 axis_labels = {"forward": struct_labels, "reverse": []}
 figsize = {"forward": (13,3.2), "reverse": (3.6,3.2)}
 ylim = {"rocauc": [0.4,0.8], "f1": [0.3,0.7]}
-dxs = {"forward": {"data-driven": 0.55, "rdoc": 0.55, "dsm": 0.55}, "reverse": {"data-driven": 0.11, "rdoc": 0.11, "dsm": 0.17}}
+dxs = {"forward": {"data-driven": 0.55, "rdoc": 0.55, "dsm": 0.55}, 
+	   "reverse": {"data-driven": 0.11, "rdoc": 0.11, "dsm": 0.17}}
 opacity = {"forward": 0.4, "reverse": 0.65}
 
 # Initialize the dictionary for statistics
@@ -279,7 +286,8 @@ for framework in frameworks:
 		rep_stats[stat][framework] = {}
 
 	# Load the classifier inputs and labels
-	lists, circuits = utilities.load_framework(framework, clf=clfs[framework], suffix=suffixes[framework], path=ontol_path)
+	lists, circuits = utilities.load_framework(framework, clf=clfs[framework], 
+											   suffix=suffixes[framework], path=ontol_path)
 	scores = utilities.score_lists(lists, dtm)
 	domains = list(circuits.columns)
 	index = {"forward": act.columns, "reverse": domains}
@@ -333,7 +341,7 @@ dif_thres = evaluation.map_framework_comparison(rep_stats, metric_labels, n_iter
 for framework in ["rdoc", "dsm"]:
 	for metric in ["rocauc", "f1"]:
 		utilities.map_plane(dif_thres[framework][metric], atlas, "{}figures".format(clf_path), 
-							plane="ortho", cmaps=["RdBu_r"], cbar=True, annotate=True, vmin=0, vmax=0.2, 
+							cmaps=["RdBu_r"], plane="ortho", cbar=True, vmaxs=[0.2], 
 				  			suffix="{}_dif_{}_{}iter".format(metric, framework, args.n_iter), verbose=False, print_fig=False)
 
 
@@ -345,11 +353,12 @@ for framework in ["rdoc", "dsm"]:
 print("\n--- ASSESSING ARTICLE PARTITIONS")
 
 # Paths to intermediary files
+mds_path = "mds/"
 mod_path = "modularity/"
 gen_path = "archetype/"
 
 # Initialize the dictionary for statistics
-stats_keys = ["obs", "mean", "boot", "null", "null_comparison"]
+stats_keys = ["obs", "mean", "boot", "null", "null_comparison", "df_null_interleaved"]
 mod_stats = {stat: {} for stat in stats_keys} 
 gen_stats = {stat: {} for stat in stats_keys}
 
@@ -359,17 +368,21 @@ eps = 0.001
 max_iter = 5000
 
 # Load the MDS of article distances that was precomputed on Sherlock
-mds_file = "mds/data/mds_metric{}_eps{}_iter{}.csv".format(int(metric), eps, max_iter)
+mds_file = "{}data/mds_metric{}_eps{}_iter{}.csv".format(mds_path, int(metric), eps, max_iter)
 X = pd.read_csv(mds_file, index_col=0, header=0).values
 
-for framework in frameworks:
+# Domain partitions will be assigned within discovery and replication splits
+part_splits = {"discovery": splits["train"], "replication": splits["validation"] + splits["test"]}
 
+for framework in frameworks:
+	
 	print("\n------ Processing the {} framework".format(titles[framework]))
+	
 
 	# Load framework data
 	lists, circuits = utilities.load_framework(framework, clf=clfs[framework], suffix=suffixes[framework], path=ontol_path)
 	words = sorted(list(set(lists["TOKEN"])))
-	domains = circuits.columns
+	domains = style.order[framework]
 
 	# Combine word and structure occurrences across articles
 	docs = partition.load_docs(dtm, act, words)
@@ -378,94 +391,85 @@ for framework in frameworks:
 	archetypes = partition.load_archetypes(lists, circuits, domains, words)
 
 	# Partition articles by similarity to domain archetypes
-	doc2dom, dom2docs = partition.load_partition(framework, clfs[framework], archetypes, docs)
+	doc2dom, dom2docs = partition.load_partition(framework, clfs[framework], part_splits, archetypes, docs)
 
-	# Plot MDS of articles with color/shape assigned by domain partition
-	colors = {framework+clfs[framework]: [style.palettes[framework][int(doc2dom[pmid])-1] for pmid in pmids]}
-	markers = {framework+clfs[framework]: [style.shapes[int(doc2dom[pmid])-1] for pmid in pmids]}
-	# mds.plot_mds(X, framework, colors, markers, metric=metric, eps=eps, max_iter=max_iter, 
-	# 			 path="mds/", suffix=clfs[framework], print_fig=False)
+	# Initialize dictionaries for statistics
+	for stat in stats_keys:
+		mod_stats[stat][framework] = {}
+		gen_stats[stat][framework] = {}
 
-	# Computing distances and related metrics is expensive, so only proceed if intermediary data file is missing
-	compute_dists, compute_mod, compute_gen = False, False, False
-		
-	mod_files = ["{}data/mod_obs_{}{}.csv".format(mod_path, framework, clfs[framework]), 
-				 "{}data/mod_mean_{}{}.csv".format(mod_path, framework, clfs[framework]),
-			 	 "{}data/mod_null_{}{}_{}iter.csv".format(mod_path, framework, clfs[framework], args.n_iter),
-			 	 "{}data/mod_boot_{}{}_{}iter.csv".format(mod_path, framework, clfs[framework], args.n_iter)]
-	for file in mod_files:
-		if not os.path.exists(file):
-			compute_dists, compute_mod = True, True
+	for split, split_pmids in part_splits.items():
 
-	gen_files = ["{}data/arche_obs_{}{}.csv".format(gen_path, framework, clfs[framework]),
-				 "{}data/arche_mean_{}{}.csv".format(gen_path, framework, clfs[framework]),
-			 	 "{}data/arche_null_{}{}_{}iter.csv".format(gen_path, framework, clfs[framework], args.n_iter),
-			 	 "{}data/arche_boot_{}{}_{}iter.csv".format(gen_path, framework, clfs[framework], args.n_iter)]
-	for file in gen_files:
-		if not os.path.exists(file):
-			compute_dists, compute_gen = True, True
+		# Load marker shapes and colors corresponding to domains
+		markers, colors = [], []
+		for pmid in pmids:
+			idx = domains.index(doc2dom[pmid])
+			markers.append(style.shapes[idx])
+			if pmid in part_splits[split]:
+				colors.append(style.palettes[framework][idx])
+			else:
+				colors.append("none")
 
-	if not os.path.exists("partition/data/doc2dom_{}_{}.csv".format(framework, clfs[framework])):
-		compute_dists = True
-
-	if compute_dists:
-		print("\n--------- Computing article distances")
-		dists = partition.compute_distances(docs)
+		# Plot MDS of articles with color/shape assigned by domain partition
+		print("\n--------- Plotting MDS for the {} split".format(split))
+		mds.plot_mds(X, "data-driven", split, colors, markers, metric, eps, max_iter, 
+					 path=mds_path, suffix=clfs[framework], print_fig=False)
 
 
-	################################################
-	############# 5. Assess modularity #############
-	################################################
+################################################
+### 5. Assess modularity & generalizability ####
+################################################
 
-	print("\n--------- Assessing modularity")
+		print("\n--------- Loading modularity and generalizability for {} set".format(split))
 
-	# Compute statistics for domain modularity
-	if compute_mod:
-		mod_stats = modularity.compute_mod_stats(mod_stats, framework, lists, dom2docs, doc2dom, dists, pmids,
-												 clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=mod_path)
-	else:
-		mod_stats = utilities.load_partition_stats(mod_stats, "mod", framework, lists, dom2docs, 
+		# Load modularity (i.e., distance between vs. within domains)
+		mod_stats = utilities.load_partition_stats(mod_stats, "mod", framework, split, lists, dom2docs, 
 												   clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=mod_path)
-
-	# Plot observed values and null distributions by domain
-	utilities.plot_violins(framework, domains, mod_stats["obs"][framework], mod_stats["null"][framework], 
-						   mod_stats["null_comparison"][framework], style.palettes[framework], metric="mod", alphas=[0], 
-						   interval=args.ci, dx=style.mod_dx[framework+clfs[framework]], font=args.font, ylim=[0.75,1.75], 
-						   yticks=np.arange(0.75,2.0,0.25), path=mod_path, suffix=clfs[framework], print_fig=False)
-
-
-	################################################
-	########## 6. Assess generalizability ##########
-	################################################
-
-	print("\n--------- Assessing generalizability")
-
-	# Compute statistics for domain similarity to archetypes
-	if compute_gen:
-		gen_stats = archetype.compute_gen_stats(gen_stats, framework, lists, dom2docs, archetypes, docs, pmids,
-												clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=gen_path)
-	else:
-		gen_stats = utilities.load_partition_stats(gen_stats, "arche", framework, lists, dom2docs, 
+		
+		# Load generalizability (i.e., similarity to domain archetypes)
+		gen_stats = utilities.load_partition_stats(gen_stats, "arche", framework, split, lists, dom2docs, 
 												   clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=gen_path)
 
-	# Plot observed values and null distributions by domain
-	utilities.plot_violins(framework, domains, gen_stats["obs"][framework], gen_stats["null"][framework], 
-						   gen_stats["null_comparison"][framework], style.palettes[framework], metric="arche", alphas=[0], 
-						   interval=args.ci, dx=style.gen_dx[framework+clfs[framework]], font=args.font, ylim=[-0.25,0.75], 
-						   yticks=np.arange(-0.25,1.0,0.25), path=gen_path, suffix=clfs[framework], print_fig=False)
 
+	print("\n--------- Plotting modularity and generalizabiltiy")
 
-# Compare macro-averaged modularity across frameworks
-mod_fdr = utilities.compare_bootstraps(mod_stats, frameworks, n_iter=args.n_iter)
-print("\nFDR for modularity\n{}".format(mod_fdr))
-utilities.plot_framework_comparison(mod_stats["boot"], mod_stats["obs"], mod_stats["mean"], metric="mod", 
-									n_iter=args.n_iter, font=args.font, ylim=[1,1.25], yticks=np.arange(1.0,1.375,0.125), 
-									path=mod_path, suffix=args.clf, print_fig=False)
+	# Plot observed modularity and null distributions by domain and split
+	mod_stats["obs"][framework] = pd.read_csv("{}data/mod_obs_{}{}.csv".format(mod_path, framework, clfs[framework]), 
+											  index_col=0, header=0) 
+	mod_stats["df_null_interleaved"][framework] = utilities.interleave_null(mod_stats["null"][framework])
+	utilities.plot_split_violins(framework, domains, mod_stats["obs"][framework], mod_stats["df_null_interleaved"][framework], 
+								 mod_stats["null_comparison"][framework], style.palettes[framework], metric="mod", 
+								 suffix=clfs[framework], path=mod_path, dx=style.mod_dx[framework + clfs[framework]], font=args.font,
+								 ylim=[0.75,1.75], yticks=[0.75,1,1.25,1.5,1.75], interval=0.999, alphas=[0], print_fig=False)
+	
+	# Plot observed generalizability and null distributions by domain and split
+	gen_stats["obs"][framework] = pd.read_csv("{}data/arche_obs_{}{}.csv".format(gen_path, framework, clfs[framework]), 
+											  index_col=0, header=0) 
+	gen_stats["df_null_interleaved"][framework] = utilities.interleave_null(gen_stats["null"][framework])
+	utilities.plot_split_violins(framework, domains, gen_stats["obs"][framework], gen_stats["df_null_interleaved"][framework], 
+								 gen_stats["null_comparison"][framework], style.palettes[framework], metric="gen", 
+								 suffix=clfs[framework], path=gen_path, dx=style.gen_dx[framework + clfs[framework]], font=args.font,
+								 ylim=[-0.25,1], yticks=[-0.25,0,0.25,0.5,0.75,1], interval=0.999, alphas=[0], print_fig=False)
 
-# Compare macro-averaged generalizability across frameworks
-gen_fdr = utilities.compare_bootstraps(gen_stats, frameworks, n_iter=args.n_iter)
-print("\nFDR for generalizability\n{}\n".format(gen_fdr))
-utilities.plot_framework_comparison(gen_stats["boot"], gen_stats["obs"], gen_stats["mean"], metric="arche", 
-									n_iter=args.n_iter, font=args.font, ylim=[-0.25,0.75], yticks=np.arange(-0.25,1.0,0.25), 
-									suffix=args.clf, path=gen_path, print_fig=False)
+	
+
+for split in part_splits:
+
+	print("\n------ Comparing frameworks in {} set".format(split))
+
+	# Compare macro-averaged statistics across frameworks
+	mod_fdr = utilities.compare_split_bootstraps(mod_stats, frameworks, split, n_iter=args.n_iter)
+	print("\n--------- FDR for modularity\n{}".format(mod_fdr))
+	mod_split_mean, mod_split_null, mod_split_boot = utilities.sort_partition_stats(mod_stats, split)
+	utilities.plot_framework_comparison(mod_split_boot, mod_stats["obs"], mod_split_mean, metric="mod", 
+										n_iter=args.n_iter, ylim=[1,1.25], yticks=np.arange(1.0,1.375,0.125), 
+										font=args.font, path=mod_path, suffix=args.clf + "_" + split, print_fig=False)
+
+	# Compare macro-averaged generalizability across frameworks
+	gen_fdr = utilities.compare_split_bootstraps(gen_stats, frameworks, split, n_iter=args.n_iter)
+	print("\n--------- FDR for generalizability\n{}\n".format(gen_fdr))
+	gen_split_mean, gen_split_null, gen_split_boot = utilities.sort_partition_stats(gen_stats, split)
+	utilities.plot_framework_comparison(gen_split_boot, gen_stats["obs"], gen_split_mean, metric="arche", 
+										n_iter=args.n_iter, ylim=[-0.25,0.75], yticks=np.arange(-0.25,1.0,0.25), 
+										font=args.font, path=gen_path, suffix=args.clf + "_" + split, print_fig=False)
 

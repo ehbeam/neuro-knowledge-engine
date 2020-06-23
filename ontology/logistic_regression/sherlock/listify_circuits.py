@@ -42,7 +42,7 @@ def load_coordinates():
 
 
 def load_domains(k):
-  list_file = "../../lists/lists_k{:02d}_oplen_logreg.csv".format(k)
+  list_file = "../../lists/lists_k{:02d}_oplen_lr.csv".format(k)
   lists = pd.read_csv(list_file, index_col=None)
   circuit_file = "../../circuits/circuits_k{:02d}.csv".format(k)
   circuits = pd.read_csv(circuit_file, index_col=None)

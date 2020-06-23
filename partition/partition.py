@@ -27,31 +27,34 @@ def load_archetypes(lists, circuits, domains, words):
 	return archetypes
 
 
-def load_partition(framework, clf, archetypes, docs):
+def load_partition(framework, clf, splits, archetypes, docs, path=""):
 
 	from scipy.spatial.distance import cdist
 
-	partition_file = "partition/data/doc2dom_{}{}.csv".format(framework, clf)
+	partition_file = "{}partition/data/doc2dom_{}{}.csv".format(path, framework, clf)
 	if not os.path.isfile(partition_file):
 
 		dom_dists = cdist(docs.values, archetypes.values.T, metric="dice")
+		dom_dists = pd.DataFrame(dom_dists, index=docs.index, columns=domains)
 
 		pmids = docs.index
 		doc2dom = {pmid: 0 for pmid in pmids}
 		for i, pmid in enumerate(pmids):
-			doc2dom[pmid] = np.argmin(dom_dists[i,:]) + 1
-
+			doc2dom[pmid] = dom_dists.columns[np.argmin(dom_dists.values[i,:])]
+		
 		partition_df = pd.Series(doc2dom)
 		partition_df.to_csv(partition_file, header=False)
 
 	else:
-		partition_df = pd.read_csv(partition_file, header=None, index_col=0)
-		doc2dom = {int(pmid): int(dom) for pmid, dom in partition_df.iterrows()}
+		doc2dom_df = pd.read_csv(partition_file, header=None, index_col=0)
+		doc2dom = {int(pmid): str(dom.values[0]) for pmid, dom in doc2dom_df.iterrows()}
 
 	domains = list(archetypes.columns)
-	dom2docs = {dom: [] for dom in domains}
+	dom2docs = {dom: {split: [] for split in ["discovery", "replication"]} for dom in domains}
 	for doc, dom in doc2dom.items():
-		dom2docs[domains[dom-1]].append(doc)
+		for split, split_pmids in splits.items():
+			if doc in split_pmids:
+				dom2docs[dom][split].append(doc)
 
 	return doc2dom, dom2docs
 
@@ -79,7 +82,7 @@ def plot_partition(framework, doc_dists, transitions, palette, figsize=(4,4),
 	ax = fig.add_axes([0,0,1,1])
 
 	X = doc_dists.values.astype(np.float)
-	im = ax.matshow(X, cmap=cm.Greys_r, vmin=0, vmax=1, alpha=1)
+	im = ax.imshow(X, cmap=cm.Greys_r, vmin=0, vmax=1, alpha=1)
 		
 	plt.xticks(transitions)
 	plt.yticks(transitions)
