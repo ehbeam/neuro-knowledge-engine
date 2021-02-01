@@ -12,9 +12,11 @@ Codebase for a manuscript in preparation by Elizabeth Beam, Christopher Potts, R
 | 1b       | ontology/ontol\_data-driven\_lr.ipynb, ontology/ontology.py                                                                   |
 | 1c       | partition/part\_splits.ipynb, partition/partition.py                                                                          |
 | 1d       | modularity/mod\_kvals\_lr.ipynb                                                                                               |
-| 1e       | archetype/arche\_kvals\_lr.ipynb                                                                                              |
+| 1e       | prototype/proto\_kvals\_lr.ipynb                                                                                              |
 | 2b       | ontology/ontol\_rdoc.ipynb, ontology/ontology.py                                                                              |
-| 3        | ontology/ontol\_data-driven\_lr.ipynb, ontology/ontol\_rdoc.ipynb, ontology/ontol\_ontol_dsm.ipynb, ontol\_sim\_lr.ipynb, ontology/ontology.py |
+| 3a       | ontology/ontol\_rdoc.ipynb, ontol\_sim\_lr.ipynb, ontology/ontology.py                                                        |
+| 3b       | ontology/ontol\_data-driven\_lr.ipynb, ontol\_sim\_lr.ipynb, ontology/ontology.py                                             |
+| 3c       | ontology/ontol\_ontol_dsm.ipynb, ontol\_sim\_lr.ipynb, ontology/ontology.py                                                   |
 | 4b, e    | prediction/pred\_data-driven_lr.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py                |
 | 4c, f    | prediction/pred\_rdoc.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py                          |
 | 4d, g    | prediction/pred\_dsm.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py                           |
@@ -24,10 +26,10 @@ Codebase for a manuscript in preparation by Elizabeth Beam, Christopher Potts, R
 | 5h       | modularity/mod\_rdoc.ipynb, modularity/modularity.py                                                                          |
 | 5i       | modularity/mod\_dsm.ipynb, modularity/modularity.py                                                                           |
 | 5j       | modularity/comp\_frameworks\_lr.ipynb, modularity/modularity.py                                                               |
-| 5k       | archetype/arche\_data-driven\_lr.ipynb, archetype/archetype.py                                                                |
-| 5l       | archetype/arche\_rdoc.ipynb, archetype/archetype.py                                                                           |
-| 5m       | archetype/arche\_dsm.ipynb, archetype/archetype.py                                                                            |
-| 5n       | archetype/comp\_frameworks\_lr.ipynb, archetype/archetype.py                                                                  |
+| 5k       | prototype/proto\_data-driven\_lr.ipynb, prototype/prototype.py                                                                |
+| 5l       | prototype/proto\_rdoc.ipynb, prototype/prototype.py                                                                           |
+| 5m       | prototype/proto\_dsm.ipynb, prototype/prototype.py                                                                            |
+| 5n       | prototype/comp\_frameworks\_lr.ipynb, prototype/prototype.py                                                                  |
 
 ### Supplementary Material
 
@@ -41,7 +43,7 @@ Codebase for a manuscript in preparation by Elizabeth Beam, Christopher Potts, R
 | 6a-b     | ontology/ontol\_data-driven\_nn.ipynb, ontology/ontology.py                                                                   |
 | 6c       | mds/mds.ipynb, mds/mds.py                                                                                                     |
 | 6d       | modularity/mod\_data-driven\_nn.ipynb, modularity/modularity.py                                                               |
-| 6e       | archetype/arche\_data-driven\_nn.ipynb, archetype/archetype.py                                                                |
+| 6e       | prototype/proto\_data-driven\_nn.ipynb, prototype/prototype.py                                                                |
 | 7-8      | ontology/ontol\_kvals\_nn.ipynb, ontology/ontology.py                                                                         |
 | 9a, d; 10b, e; 11a, d | prediction/pred\_data-driven_lr.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py   |
 | 9b, e; 10c, f; 11b, e | prediction/pred\_rdoc.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py             |
