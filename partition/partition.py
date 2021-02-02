@@ -13,28 +13,28 @@ def load_docs(dtm, act, words):
 	return docs
 
 
-def load_archetypes(lists, circuits, domains, words):
+def load_prototypes(lists, circuits, domains, words):
 
 	structures = sorted(list(set(circuits.index)))
-	archetypes = pd.DataFrame(0.0, index=words+structures, columns=domains)
+	prototypes = pd.DataFrame(0.0, index=words+structures, columns=domains)
 	for dom in domains:
 		for word in lists.loc[lists["DOMAIN"] == dom, "TOKEN"]:
-			archetypes.loc[word, dom] = 1.0
+			prototypes.loc[word, dom] = 1.0
 		for struct in structures:
-			archetypes.loc[struct, dom] = circuits.loc[struct, dom]
-	archetypes[archetypes > 0.0] = 1.0
+			prototypes.loc[struct, dom] = circuits.loc[struct, dom]
+	prototypes[prototypes > 0.0] = 1.0
 	
-	return archetypes
+	return prototypes
 
 
-def load_partition(framework, clf, splits, archetypes, docs, path=""):
+def load_partition(framework, clf, splits, prototypes, docs, path=""):
 
 	from scipy.spatial.distance import cdist
 
 	partition_file = "{}partition/data/doc2dom_{}{}.csv".format(path, framework, clf)
 	if not os.path.isfile(partition_file):
 
-		dom_dists = cdist(docs.values, archetypes.values.T, metric="dice")
+		dom_dists = cdist(docs.values, prototypes.values.T, metric="dice")
 		dom_dists = pd.DataFrame(dom_dists, index=docs.index, columns=domains)
 
 		pmids = docs.index
@@ -49,7 +49,7 @@ def load_partition(framework, clf, splits, archetypes, docs, path=""):
 		doc2dom_df = pd.read_csv(partition_file, header=None, index_col=0)
 		doc2dom = {int(pmid): str(dom.values[0]) for pmid, dom in doc2dom_df.iterrows()}
 
-	domains = list(archetypes.columns)
+	domains = list(prototypes.columns)
 	dom2docs = {dom: {split: [] for split in ["discovery", "replication"]} for dom in domains}
 	for doc, dom in doc2dom.items():
 		for split, split_pmids in splits.items():
