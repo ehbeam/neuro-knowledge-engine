@@ -1,2 +1,0 @@
-corpus_190124.txt filter=lfs diff=lfs merge=lfs -text
-glove_n100_win15_min5_iter500_190124.txt filter=lfs diff=lfs merge=lfs -text
