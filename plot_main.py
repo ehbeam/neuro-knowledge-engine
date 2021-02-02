@@ -2,11 +2,16 @@
 
 """plot_main.py: Generates plots in the main text of 'A computational knowledge engine for human neuroscience'"""
 
-__author__	  = "Elizabeth Beam"
+__author__	  	= "Elizabeth Beam"
 __email__ 		= "ebeam@stanford.edu"
-__copyright__   = "Copyright 2020, Elizabeth Beam"
-__license__	 = "MIT"
-__version__		= "1.0.0"
+__copyright__   = "Copyright 2021, Elizabeth Beam"
+__license__	 	= "MIT"
+__version__		= "1.0.1"
+
+# Version 1.0.1: 
+#   - Runs on atlas of 118 regions with cerebellar substructures.
+#   - Uses 'protoype' in place of 'archetype' in script and variable names.
+#   - Computes modularity and generalizability within discovery and replication splits.
 
 
 # Built-in python modules
@@ -25,7 +30,7 @@ from style import style
 from ontology import ontology
 from prediction import evaluation
 from partition import partition
-from archetype import archetype
+from prototype import prototype
 from modularity import modularity
 from mds import mds
 
@@ -326,6 +331,7 @@ for framework in frameworks:
 							 			dx=0.375, dxs=dxs[direction][framework], font=args.font, path=clf_path, print_fig=False)
 
 # Compare the frameworks
+print("\n------ Comparing framework prediction performance")
 rep_fdr = evaluation.compare_frameworks(rep_stats, frameworks, directions, metric_labels, n_iter=args.n_iter)
 for direction in directions:
 	print("\n--------- {} inference".format(direction.title()))
@@ -336,7 +342,7 @@ for direction in directions:
 	evaluation.plot_framework_comparison("f1", direction, rep_stats["boot"], n_iter=args.n_iter, font=args.font, 
 										 ylim=[0.3,0.7], yticks=np.arange(0.3,0.75,0.05), path=clf_path, print_fig=False)
 
-print("\nMapping differences in forward inference")
+print("\n------ Mapping differences in forward inference")
 dif_thres = evaluation.map_framework_comparison(rep_stats, metric_labels, n_iter=args.n_iter, alpha=args.alpha)
 for framework in ["rdoc", "dsm"]:
 	for metric in ["rocauc", "f1"]:
@@ -355,7 +361,7 @@ print("\n--- ASSESSING ARTICLE PARTITIONS")
 # Paths to intermediary files
 mds_path = "mds/"
 mod_path = "modularity/"
-gen_path = "archetype/"
+gen_path = "prototype/"
 
 # Initialize the dictionary for statistics
 stats_keys = ["obs", "mean", "boot", "null", "null_comparison", "df_null_interleaved"]
@@ -387,11 +393,11 @@ for framework in frameworks:
 	# Combine word and structure occurrences across articles
 	docs = partition.load_docs(dtm, act, words)
 
-	# Compute "archetypes" of included words and structures
-	archetypes = partition.load_archetypes(lists, circuits, domains, words)
+	# Compute "prototypes" of included words and structures
+	prototypes = partition.load_prototypes(lists, circuits, domains, words)
 
-	# Partition articles by similarity to domain archetypes
-	doc2dom, dom2docs = partition.load_partition(framework, clfs[framework], part_splits, archetypes, docs)
+	# Partition articles by similarity to domain prototypes
+	doc2dom, dom2docs = partition.load_partition(framework, clfs[framework], part_splits, prototypes, docs)
 
 	# Initialize dictionaries for statistics
 	for stat in stats_keys:
@@ -426,8 +432,8 @@ for framework in frameworks:
 		mod_stats = utilities.load_partition_stats(mod_stats, "mod", framework, split, lists, dom2docs, 
 												   clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=mod_path)
 		
-		# Load generalizability (i.e., similarity to domain archetypes)
-		gen_stats = utilities.load_partition_stats(gen_stats, "arche", framework, split, lists, dom2docs, 
+		# Load generalizability (i.e., similarity to domain prototypes)
+		gen_stats = utilities.load_partition_stats(gen_stats, "proto", framework, split, lists, dom2docs, 
 												   clf=clfs[framework], n_iter=args.n_iter, alpha=args.alpha, path=gen_path)
 
 
@@ -443,7 +449,7 @@ for framework in frameworks:
 								 ylim=[0.75,1.75], yticks=[0.75,1,1.25,1.5,1.75], interval=0.999, alphas=[0], print_fig=False)
 	
 	# Plot observed generalizability and null distributions by domain and split
-	gen_stats["obs"][framework] = pd.read_csv("{}data/arche_obs_{}{}.csv".format(gen_path, framework, clfs[framework]), 
+	gen_stats["obs"][framework] = pd.read_csv("{}data/proto_obs_{}{}.csv".format(gen_path, framework, clfs[framework]), 
 											  index_col=0, header=0) 
 	gen_stats["df_null_interleaved"][framework] = utilities.interleave_null(gen_stats["null"][framework])
 	utilities.plot_split_violins(framework, domains, gen_stats["obs"][framework], gen_stats["df_null_interleaved"][framework], 
@@ -469,7 +475,7 @@ for split in part_splits:
 	gen_fdr = utilities.compare_split_bootstraps(gen_stats, frameworks, split, n_iter=args.n_iter)
 	print("\n--------- FDR for generalizability\n{}\n".format(gen_fdr))
 	gen_split_mean, gen_split_null, gen_split_boot = utilities.sort_partition_stats(gen_stats, split)
-	utilities.plot_framework_comparison(gen_split_boot, gen_stats["obs"], gen_split_mean, metric="arche", 
+	utilities.plot_framework_comparison(gen_split_boot, gen_stats["obs"], gen_split_mean, metric="proto", 
 										n_iter=args.n_iter, ylim=[-0.25,0.75], yticks=np.arange(-0.25,1.0,0.25), 
 										font=args.font, path=gen_path, suffix=args.clf + "_" + split, print_fig=False)
 
