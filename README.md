@@ -1,10 +1,10 @@
-# A computational knowledge engine for human neuroscience
+# A data-driven framework for mapping domains of human neurobiology
 
-Code repository for a manuscript in preparation by Elizabeth Beam, Christopher Potts, Russell Poldrack, & Amit Etkin
+Code repository for the manuscript by Elizabeth Beam, Christopher Potts, Russell Poldrack, & Amit Etkin
 
 ## Abstract
 
-Functional neuroimaging has been a mainstay of human neuroscience for the past 25 years. Interpretation of fMRI data has often occurred within knowledge frameworks crafted by experts, which have the potential to reify historical trends and amplify biases that limit the replicability of findings. Here, we employ a computational approach to derive a data-driven framework for neurobiological domains that synthesizes the texts and data of nearly 20,000 human neuroimaging articles. Crucially, the structure-function links in each domain better replicate across held-out articles than those mapped from dominant frameworks in neuroscience and psychiatry. We further show that the data-driven framework partitions the literature into modular subfields, for which the domains serve as generalizable prototypes of structure-function patterns observed in single articles. The approach to computational ontology we present here is the most comprehensive characterization of human brain circuits quantifiable with fMRI, and moreover, can be extended to synthesize other scientific literatures.
+Functional neuroimaging has been a mainstay of human neuroscience for the past 25 years. Interpretation of fMRI data has often occurred within knowledge frameworks crafted by experts, which have the potential to amplify biases that limit the replicability of findings. Here, we employ a computational approach to derive a data-driven framework for neurobiological domains that synthesizes the texts and data of nearly 20,000 human neuroimaging articles. Across multiple levels of domain specificity, the structure-function links within domains better replicate in held- out articles than those mapped from dominant frameworks in neuroscience and psychiatry. We further show that the data-driven framework partitions the literature into modular subfields, for which domains serve as generalizable prototypes of structure-function patterns in single articles. The approach to computational ontology we present here is the most comprehensive characterization of human brain circuits quantifiable with fMRI and may be extended to synthesize other scientific literatures.
 
 
 ## Pipelines
@@ -53,41 +53,54 @@ Functional neuroimaging has been a mainstay of human neuroscience for the past 2
 | 6m       | prototype/proto\_dsm.ipynb, prototype/prototype.py                                                                            |
 | 6n       | prototype/comp\_frameworks\_lr.ipynb, prototype/prototype.py                                                                  |
 
-### Supplementary Material
+### Extended Data
 
 | Figure   | Files                                                                                                                         |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | 1        | corpus/cohorts.ipynb                                                                                                          |
-| 2        | validation/val\_brainmap\_top.ipynb                                                                                           |
-| 3        | validation/val\_brainmap\_sims.ipynb                                                                                          |
-| 4-5      | ontology/ontol\_kvals\_lr.ipynb, ontology/ontology.py                                                                         |
-| 6a-b     | ontology/ontol\_data-driven\_nn.ipynb, ontology/ontology.py                                                                   |
-| 6c       | mds/mds.ipynb, mds/mds.py                                                                                                     |
-| 6d       | modularity/mod\_data-driven\_nn.ipynb, modularity/modularity.py                                                               |
-| 6e       | prototype/proto\_data-driven\_nn.ipynb, prototype/prototype.py                                                                |
-| 7-8      | ontology/ontol\_kvals\_nn.ipynb, ontology/ontology.py                                                                         |
-| 9        | stability/stab\_data-driven\_lr\_top.ipynb                                                                                    |
-| 10a      | ontology/ontol\_data-driven_terms.ipynb, ontology/ontol\_sim\_terms.ipynb, ontology/ontology.py                               |
-| 10b-e    | ontology/ontol\_sim\_terms.ipynb                                                                                              |
-| 11a, d   | prediction/comp\_frameworks\_lr\_k09.ipynb                                                                                    |
-| 11b-c, e-f | prediction/pred\_data-driven\_lr\_k09.ipynb                                                                                 |
-| 11g-h    | partition/part\_data-driven\_lr\_k09.ipynb, mds/mds.ipynb                                                                     |
-| 11i Left | modularity/comp\_frameworks\_lr\_k09.ipynb                                                                                    |
-| 11i Right | modularity/mod\_data-driven\_lr\_k09.ipynb                                                                                   |
-| 11j Left | prototype/comp\_frameworks\_lr\_k09.ipynb                                                                                     |
-| 11j Right | prototype/proto_data-driven\_lr\_k09.ipynb                                                                                   |
-| 12a, d; 13b, e; 14a, d | prediction/pred\_data-driven_lr.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py  |
-| 12b, e; 13c, f; 14b, e | prediction/pred\_rdoc.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py            |
-| 12c, f; 13d, g; 14c, f | prediction/pred\_dsm.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py             |
-| 12g, 13h-j, 14g-i | prediction/comp\_frameworks\_lr.ipynb                                                                                |
-| 15b, e; 16a, d; 17b, e; 18a, d | prediction/pred\_data-driven_nn.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py |
-| 15c, f; 16b, e; 17c, f; 18b, e | prediction/pred\_rdoc.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py |
-| 15d, g; 16c, f; 17d, g; 18c, f | prediction/pred\_dsm.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py |
-| 15h, 16g, 17h-j, 18g-i | prediction/comp\_frameworks\_nn.ipynb                                                                           |
-| 19a      | partition/part\_data-driven\_lr.ipynb, partition/partition.py                                                                 |
-| 19b      | partition/part\_rdoc.ipynb, partition/partition.py                                                                            |
-| 19c      | partition/part\_dsm.ipynb, partition/partition.py                                                                             |
-| 19d-f    | tsne/tsne.ipynb                                                                                                               |
+| 2-3      | ontology/ontol\_kvals\_lr.ipynb, ontology/ontology.py                                                                         |
+| 4a-b     | ontology/ontol\_data-driven\_nn.ipynb, ontology/ontology.py                                                                   |
+| 4c       | mds/mds.ipynb, mds/mds.py                                                                                                     |
+| 4d       | modularity/mod\_data-driven\_nn.ipynb, modularity/modularity.py                                                               |
+| 4e       | prototype/proto\_data-driven\_nn.ipynb, prototype/prototype.py                                                                |
+| 5a       | ontology/ontol\_data-driven_terms.ipynb, ontology/ontol\_sim\_terms.ipynb, ontology/ontology.py                               |
+| 5b-e     | ontology/ontol\_sim\_terms.ipynb                                                                                              |
+| 6a, d    | prediction/comp\_frameworks\_lr\_k09.ipynb                                                                                    |
+| 6b-c, e-f| prediction/pred\_data-driven\_lr\_k09.ipynb                                                                                   |
+| 6g-h     | partition/part\_data-driven\_lr\_k09.ipynb, mds/mds.ipynb                                                                     |
+| 6i Left  | modularity/comp\_frameworks\_lr\_k09.ipynb                                                                                    |
+| 6i Right | modularity/mod\_data-driven\_lr\_k09.ipynb                                                                                    |
+| 6j Left  | prototype/comp\_frameworks\_lr\_k09.ipynb                                                                                     |
+| 6j Right | prototype/proto_data-driven\_lr\_k09.ipynb                                                                                    |
+| 7b, e    | prediction/pred\_data-driven_lr.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py                |
+| 7c, f    | prediction/pred\_rdoc.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py                          |
+| 7d, g    | prediction/pred\_dsm.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py                           |
+| 7h-j     | prediction/comp\_frameworks\_lr.ipynb                                                                                         |
+| 8b, e; 9b, e | prediction/pred\_data-driven_nn.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py   |
+| 8c, f; 9c, f | prediction/pred\_rdoc.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py             |
+| 8d, g; 9d, g | prediction/pred\_dsm.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py              |
+| 8h; 9h-j | prediction/comp\_frameworks\_nn.ipynb                                                                                         |
+| 10a      | partition/part\_data-driven\_lr.ipynb, partition/partition.py                                                                 |
+| 10b      | partition/part\_rdoc.ipynb, partition/partition.py                                                                            |
+| 10c      | partition/part\_dsm.ipynb, partition/partition.py                                                                             |
+| 10d-f    | tsne/tsne.ipynb                                                                                                               |
+
+### Supplementary Material
+
+| Figure   | Files                                                                                                                         |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1        | validation/val\_brainmap\_top.ipynb                                                                                           |
+| 2        | validation/val\_brainmap\_sims.ipynb                                                                                          |
+| 3-4      | ontology/ontol\_kvals\_nn.ipynb, ontology/ontology.py                                                                         |
+| 5        | stability/stab\_data-driven\_lr\_top.ipynb                                                                                    |
+| 6a, d; 7a, d | prediction/pred\_data-driven_lr.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py            |
+| 6b, e; 7b, e | prediction/pred\_rdoc.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py                      |
+| 6c, f; 7c, f | prediction/pred\_dsm.ipynb, prediction/logistic\_regression/prediction.py, prediction/evaluation.py                       |
+| 6g; 7g-i | prediction/comp\_frameworks\_lr.ipynb                                                                                         |
+| 8a, d; 9a, d | prediction/pred\_data-driven_nn.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py   |
+| 8b, e; 9b, e | prediction/pred\_rdoc.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py             |
+| 8c, f; 9c, f | prediction/pred\_dsm.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py              |
+| 8g; 9g-i | prediction/comp\_frameworks\_nn.ipynb                                                                                         |
 
 | Table    | Files                                                                                                                         |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
