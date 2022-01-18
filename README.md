@@ -1,6 +1,6 @@
 # A data-driven framework for mapping domains of human neurobiology
 
-Code repository for the manuscript by Elizabeth Beam, Christopher Potts, Russell Poldrack, & Amit Etkin
+Code repository for the [article]() in <i>Nature Neuroscience</i> by Elizabeth Beam, Christopher Potts, Russell Poldrack, & Amit Etkin
 
 ## Abstract
 
@@ -79,7 +79,7 @@ Functional neuroimaging has been a mainstay of human neuroscience for the past 2
 | 8b, e; 9b, e | prediction/pred\_data-driven_nn.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py   |
 | 8c, f; 9c, f | prediction/pred\_rdoc.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py             |
 | 8d, g; 9d, g | prediction/pred\_dsm.ipynb, prediction/neural\_network/sherlock/neural\_network.py, prediction/evaluation.py              |
-| 8h; 9h-j | prediction/comp\_frameworks\_nn.ipynb                                                                                         |
+| 8h; 9h-j | prediction/comp\_frameworks\_nn.ipynb     U                                                                                    |
 | 10a      | partition/part\_data-driven\_lr.ipynb, partition/partition.py                                                                 |
 | 10b      | partition/part\_rdoc.ipynb, partition/partition.py                                                                            |
 | 10c      | partition/part\_dsm.ipynb, partition/partition.py                                                                             |
