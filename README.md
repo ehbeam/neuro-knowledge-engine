@@ -1,6 +1,6 @@
 # A data-driven framework for mapping domains of human neurobiology
 
-Code repository for the [article]() in <i>Nature Neuroscience</i> by Elizabeth Beam, Christopher Potts, Russell Poldrack, & Amit Etkin
+Code repository for the [article](https://rdcu.be/cBemL) in <i>Nature Neuroscience</i> by Elizabeth Beam, Christopher Potts, Russell Poldrack, & Amit Etkin
 
 ## Abstract
 
